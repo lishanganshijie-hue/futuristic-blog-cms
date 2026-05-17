@@ -151,17 +151,19 @@ const scrollTo = (scrollTop: number) => {
 
 const handleCopyCode = (e: MouseEvent) => {
   const target = e.target as HTMLElement
-  if (target.classList.contains('copy-code-btn')) {
-    const encodedCode = target.getAttribute('data-code')
+  const btn = target.closest('.copy-code-btn') as HTMLElement
+  if (btn) {
+    const encodedCode = btn.getAttribute('data-code')
     if (encodedCode) {
       const code = decodeURIComponent(encodedCode)
       navigator.clipboard.writeText(code).then(() => {
-        const originalText = target.textContent
-        target.textContent = '已复制!'
-        target.classList.add('text-green-400')
+        const originalHTML = btn.innerHTML
+        const originalClass = btn.className
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`
+        btn.className = originalClass + ' text-green-400'
         setTimeout(() => {
-          target.textContent = originalText
-          target.classList.remove('text-green-400')
+          btn.innerHTML = originalHTML
+          btn.className = originalClass
         }, 2000)
       })
     }
