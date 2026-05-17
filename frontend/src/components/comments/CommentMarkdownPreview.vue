@@ -53,7 +53,7 @@ const createRenderer = () => {
     
     return `<div class="code-block-wrapper relative group">
       <div class="absolute top-1 right-1 z-20">
-        <button class="copy-code-btn p-1 bg-gray-700 dark:bg-gray-600 rounded text-white hover:text-primary transition-colors shadow-lg" data-code="${encodedCode}">${copyIcon}</button>
+        <button class="copy-code-btn p-1 rounded text-gray-500 hover:text-primary transition-colors" data-code="${encodedCode}">${copyIcon}</button>
       </div>
       ${langLabelHtml}
       <pre class="!my-2"><code class="hljs language-${validLang}">${highlighted}</code></pre>

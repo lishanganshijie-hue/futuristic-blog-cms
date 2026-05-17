@@ -93,7 +93,7 @@ renderer.code = (code: string, infostring: string | undefined, _escaped: boolean
   const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`
   return `<div class="code-block-wrapper relative group">
     <div class="absolute top-2 right-2 z-20">
-      <button class="copy-code-btn p-1.5 bg-gray-700 dark:bg-gray-600 rounded text-white hover:text-primary transition-colors shadow-lg" data-code="${encodedCode}">${copyIcon}</button>
+      <button class="copy-code-btn p-1.5 rounded text-gray-500 hover:text-primary transition-colors" data-code="${encodedCode}">${copyIcon}</button>
     </div>
     <pre><code class="hljs language-${validLang}">${highlighted}</code></pre>
   </div>`
