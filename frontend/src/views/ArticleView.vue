@@ -1601,8 +1601,12 @@ watch(article, async (newVal) => {
 }
 
 .article-content :deep(.code-block-wrapper) {
-  @apply relative;
+  @apply relative overflow-visible;
   min-width: 0;
+}
+
+.article-content :deep(.code-block-wrapper pre) {
+  @apply overflow-x-auto overflow-y-hidden;
 }
 
 .article-content :deep(code) {
