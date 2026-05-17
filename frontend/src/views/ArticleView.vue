@@ -90,9 +90,10 @@ renderer.code = (code: string, infostring: string | undefined, _escaped: boolean
   const validLang = infostring && hljs.getLanguage(infostring) ? infostring : 'plaintext'
   const highlighted = hljs.highlight(code, { language: validLang }).value
   const encodedCode = encodeURIComponent(code)
+  const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`
   return `<div class="code-block-wrapper relative group">
-    <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-      <button class="copy-code-btn px-2 py-1 bg-dark-200 rounded text-xs text-gray-400 hover:text-primary transition-colors" data-code="${encodedCode}">复制</button>
+    <div class="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+      <button class="copy-code-btn p-1.5 bg-dark-200 dark:bg-dark-300 rounded text-gray-400 hover:text-primary transition-colors" data-code="${encodedCode}">${copyIcon}</button>
     </div>
     <pre><code class="hljs language-${validLang}">${highlighted}</code></pre>
   </div>`
