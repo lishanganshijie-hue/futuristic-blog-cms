@@ -114,13 +114,6 @@ const fileUrl = computed(() => {
   return `/api/v1/files/${props.file.id}/content`
 })
 
-const downloadUrl = computed(() => {
-  if (directUrl.value) {
-    return directUrl.value
-  }
-  return `/api/v1/files/${props.file.id}/download`
-})
-
 const isLocalhost = computed(() => {
   const hostname = window.location.hostname
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')
@@ -596,8 +589,20 @@ const handleIframeError = () => {
   errorType.value = 'fetch_failed'
 }
 
-const handleDownload = () => {
-  window.open(downloadUrl.value, '_blank')
+const handleDownload = async () => {
+  try {
+    const response = await fileApi.downloadFile(props.file.id)
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', props.file.original_filename)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Failed to download file:', error)
+  }
 }
 
 const handleKeydown = (e: KeyboardEvent) => {
