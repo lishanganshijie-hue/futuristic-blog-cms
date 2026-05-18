@@ -429,7 +429,26 @@ async def download_file(
     db.commit()
     
     if db_file.file_path.startswith("http"):
-        return RedirectResponse(url=db_file.file_path, status_code=302)
+        from fastapi.responses import StreamingResponse
+        
+        encoded_filename = quote(db_file.original_filename)
+        
+        async def stream_from_supabase():
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                async with client.stream("GET", db_file.file_path) as response:
+                    if response.status_code != 200:
+                        raise HTTPException(status_code=500, detail="无法获取文件内容")
+                    async for chunk in response.aiter_bytes(chunk_size=65536):
+                        yield chunk
+        
+        return StreamingResponse(
+            stream_from_supabase(),
+            media_type=db_file.mime_type,
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+                "Access-Control-Allow-Origin": "*"
+            }
+        )
     
     actual_path = db_file.file_path
     if db_file.file_path.startswith("/uploads/"):
