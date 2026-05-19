@@ -59,6 +59,7 @@ async def lifespan(app: FastAPI):
             
             migrate_foreign_key_ondelete()
             migrate_add_bookmark_count()
+            migrate_add_article_likes_indexes()
             migrate_add_author_name_and_reply_to_user_name()
             migrate_resources_category_nullable()
             logger.info("Database tables created successfully")
@@ -436,6 +437,7 @@ async def background_init():
         
         migrate_foreign_key_ondelete()
         migrate_add_bookmark_count()
+        migrate_add_article_likes_indexes()
         migrate_add_author_name_and_reply_to_user_name()
         migrate_resources_category_nullable()
         logger.info("Database tables created")
@@ -874,6 +876,60 @@ def migrate_add_bookmark_count():
             logger.info("Migration: bookmark_count column already exists")
     except Exception as e:
         logger.error(f"Error migrating bookmark_count column: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def migrate_add_article_likes_indexes():
+    from sqlalchemy import text, inspect
+    
+    db = SessionLocal()
+    try:
+        inspector = inspect(db.get_bind())
+        
+        if is_sqlite:
+            indexes = inspector.get_indexes('article_likes')
+            index_names = [idx['name'] for idx in indexes]
+            
+            if 'ix_article_likes_user_id' not in index_names:
+                try:
+                    db.execute(text('CREATE INDEX ix_article_likes_user_id ON article_likes(user_id)'))
+                    logger.info("Migration: article_likes user_id index created")
+                except Exception as e:
+                    logger.warning(f"Could not create user_id index: {e}")
+            
+            if 'ix_article_likes_user_article' not in index_names:
+                try:
+                    db.execute(text('CREATE INDEX ix_article_likes_user_article ON article_likes(user_id, article_id)'))
+                    logger.info("Migration: article_likes composite index created")
+                except Exception as e:
+                    logger.warning(f"Could not create composite index: {e}")
+            
+            db.commit()
+        else:
+            indexes = inspector.get_indexes('article_likes')
+            index_names = [idx['name'] for idx in indexes]
+            
+            if 'ix_article_likes_user_id' not in index_names:
+                try:
+                    db.execute(text('CREATE INDEX ix_article_likes_user_id ON article_likes(user_id)'))
+                    logger.info("Migration: article_likes user_id index created")
+                except Exception as e:
+                    logger.warning(f"Could not create user_id index: {e}")
+            
+            if 'ix_article_likes_user_article' not in index_names:
+                try:
+                    db.execute(text('CREATE INDEX ix_article_likes_user_article ON article_likes(user_id, article_id)'))
+                    logger.info("Migration: article_likes composite index created")
+                except Exception as e:
+                    logger.warning(f"Could not create composite index: {e}")
+            
+            db.commit()
+            
+        logger.info("Migration: article_likes indexes check completed")
+    except Exception as e:
+        logger.error(f"Error migrating article_likes indexes: {e}")
         db.rollback()
     finally:
         db.close()

@@ -126,6 +126,7 @@ export const useAuthStore = defineStore('auth', () => {
           const roles = (response as any).user?.roles || []
           permissionStore.myPermissions = (response as any).permissions
           permissionStore.myRoles = roles
+          permissionStore.markReady()
         } catch {
           // Permission store might not be available
         }
@@ -161,8 +162,6 @@ export const useAuthStore = defineStore('auth', () => {
     if (!token.value) return
     try {
       user.value = await authApi.getMe()
-      const permissionStore = usePermissionStore()
-      await permissionStore.fetchMyPermissions()
     } catch (error) {
       console.error('Failed to fetch user:', error)
       logout()

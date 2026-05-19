@@ -5,6 +5,7 @@ from app.core.database import get_db
 from app.models import Article, ArticleBookmark, User
 from app.schemas import BookmarkResponse, ArticleListItem, PaginatedResponse, CategoryResponse, TagResponse, UserResponse
 from app.utils.auth import get_current_user
+from app.utils.cache import cache_manager
 from typing import List
 
 router = APIRouter(prefix="/bookmarks", tags=["bookmarks"])
@@ -109,6 +110,8 @@ async def toggle_bookmark(
     
     db.commit()
     db.refresh(article)
+    
+    cache_manager.delete("user_interaction", f"user_interaction_{current_user.id}")
     
     return BookmarkResponse(
         article_id=article_id,

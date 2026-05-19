@@ -10,6 +10,7 @@ export const usePermissionStore = defineStore('permission', () => {
   const myPermissions = ref<string[]>([])
   const myRoles = ref<{ id: number; name: string; code: string }[]>([])
   const isLoading = ref(false)
+  const isReady = ref(false)
 
   const isSuperAdmin = computed(() => {
     return myRoles.value.some(r => r.code === 'super_admin')
@@ -25,6 +26,10 @@ export const usePermissionStore = defineStore('permission', () => {
 
   const hasAllPermissions = (codes: string[]): boolean => {
     return codes.every(code => myPermissions.value.includes(code))
+  }
+
+  const markReady = () => {
+    isReady.value = true
   }
 
   const fetchPermissions = async (module?: string, isActive?: boolean) => {
@@ -56,6 +61,7 @@ export const usePermissionStore = defineStore('permission', () => {
       const result = await permissionApi.getMyPermissions()
       myPermissions.value = result.permissions
       myRoles.value = result.roles
+      isReady.value = true
     } catch (error) {
       console.error('Failed to fetch my permissions:', error)
     }
@@ -132,10 +138,12 @@ export const usePermissionStore = defineStore('permission', () => {
     myPermissions,
     myRoles,
     isLoading,
+    isReady,
     isSuperAdmin,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
+    markReady,
     fetchPermissions,
     fetchPermissionTree,
     fetchRoles,

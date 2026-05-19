@@ -13,6 +13,7 @@ from app.schemas.schemas import (
 )
 from app.services.permission_service import PermissionService
 from app.services.log_service import LogService
+from app.utils.cache import cache_manager
 import json
 
 router = APIRouter(prefix="/roles", tags=["roles"])
@@ -414,6 +415,12 @@ async def update_role(
     try:
         db.commit()
         db.refresh(role)
+        
+        user_ids_in_role = db.execute(
+            user_roles.select().where(user_roles.c.role_id == role.id)
+        ).fetchall()
+        for ur in user_ids_in_role:
+            cache_manager.delete("user_permissions", f"user_permissions_{ur.user_id}")
     except IntegrityError as e:
         db.rollback()
         error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
@@ -523,6 +530,12 @@ async def update_role_permissions(
         permission_ids=perm_data.permission_ids
     )
     
+    user_ids_in_role = db.execute(
+        user_roles.select().where(user_roles.c.role_id == role_id)
+    ).fetchall()
+    for ur in user_ids_in_role:
+        cache_manager.delete("user_permissions", f"user_permissions_{ur.user_id}")
+    
     PermissionService.log_permission_change(
         db=db,
         operator_id=current_user.id,
@@ -567,6 +580,11 @@ async def delete_role(
     if role.is_system:
         raise HTTPException(status_code=400, detail="系统角色不能删除")
     
+    user_ids_in_role = db.execute(
+        user_roles.select().where(user_roles.c.role_id == role_id)
+    ).fetchall()
+    user_ids_to_clear = [ur.user_id for ur in user_ids_in_role]
+    
     db.execute(
         role_permissions.delete().where(
             role_permissions.c.role_id == role_id
@@ -586,6 +604,9 @@ async def delete_role(
     
     db.delete(role)
     db.commit()
+    
+    for user_id in user_ids_to_clear:
+        cache_manager.delete("user_permissions", f"user_permissions_{user_id}")
     
     PermissionService.log_permission_change(
         db=db,
@@ -671,6 +692,7 @@ async def assign_roles(
             role_ids=assign_data.role_ids,
             assigned_by=current_user.id
         )
+        cache_manager.delete("user_permissions", f"user_permissions_{user_id}")
     
     description = f"为用户 [{', '.join(user_names)}] 分配角色 [{', '.join(role_names)}]"
     
@@ -765,6 +787,7 @@ async def remove_roles(
             user_id=user_id,
             role_ids=remove_data.role_ids
         )
+        cache_manager.delete("user_permissions", f"user_permissions_{user_id}")
     
     description = f"移除用户 [{', '.join(user_names)}] 的角色 [{', '.join(role_names)}]"
     

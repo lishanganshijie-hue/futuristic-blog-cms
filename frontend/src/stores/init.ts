@@ -8,6 +8,7 @@ import { useSiteConfigStore } from './siteConfig'
 import { useUserProfileStore } from './userProfile'
 import { useUserInteractionStore } from './userInteraction'
 import { useAuthStore } from './auth'
+import { usePermissionStore } from './permission'
 
 export const useInitStore = defineStore('init', () => {
   const isCoreInitialized = ref(false)
@@ -88,6 +89,13 @@ export const useInitStore = defineStore('init', () => {
           }
           
           userInteractionStore.markInitialized()
+          
+          if (data.user_permissions) {
+            const permissionStore = usePermissionStore()
+            permissionStore.myPermissions = data.user_permissions.permissions
+            permissionStore.myRoles = data.user_permissions.roles
+            permissionStore.markReady()
+          }
         }
         
         isCoreInitialized.value = true

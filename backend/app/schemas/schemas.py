@@ -435,6 +435,8 @@ class Token(BaseModel):
     token_type: str = "bearer"
     refresh_token: Optional[str] = None
     expires_in: Optional[int] = None
+    user: Optional[dict] = None
+    permissions: Optional[List[str]] = None
 
 
 class TokenData(BaseModel):

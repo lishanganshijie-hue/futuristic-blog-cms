@@ -18,6 +18,7 @@ from app.schemas import (
 )
 from app.utils.auth import get_current_user_optional
 from app.utils.cache import cache_manager
+from app.services.permission_service import PermissionService
 
 router = APIRouter(prefix="/init", tags=["Init"])
 logger = logging.getLogger(__name__)
@@ -32,6 +33,11 @@ class PublicStats(BaseModel):
     total_comments: int
 
 
+class UserPermissions(BaseModel):
+    permissions: List[str] = []
+    roles: List[Dict[str, Any]] = []
+
+
 class InitResponse(BaseModel):
     site_config: List[SiteConfigResponse]
     categories: List[CategoryResponse]
@@ -44,6 +50,7 @@ class InitResponse(BaseModel):
     user_profile: Optional[UserProfileResponse] = None
     liked_article_ids: Optional[List[int]] = None
     bookmarked_article_ids: Optional[List[int]] = None
+    user_permissions: Optional[UserPermissions] = None
 
 
 def _get_site_configs_cached() -> List[SiteConfigResponse]:
@@ -359,6 +366,11 @@ def _get_user_profile_data(user_id: int, username: str) -> Dict[str, Any]:
 
 
 def _get_user_interaction_data(user_id: int) -> tuple:
+    cache_key = f"user_interaction_{user_id}"
+    cached = cache_manager.get("user_interaction", cache_key)
+    if cached:
+        return cached.get("liked", []), cached.get("bookmarked", [])
+    
     db = SessionLocal()
     try:
         liked = db.query(ArticleLike.article_id).filter(
@@ -371,7 +383,34 @@ def _get_user_interaction_data(user_id: int) -> tuple:
         ).all()
         bookmarked_article_ids = [b[0] for b in bookmarked]
         
+        cache_manager.set("user_interaction", cache_key, {
+            "liked": liked_article_ids,
+            "bookmarked": bookmarked_article_ids
+        }, ttl=30)
+        
         return liked_article_ids, bookmarked_article_ids
+    finally:
+        db.close()
+
+
+def _get_user_permissions_data(user_id: int) -> Dict[str, Any]:
+    db = SessionLocal()
+    try:
+        cache_key = f"user_permissions_{user_id}"
+        cached = cache_manager.get("user_permissions", cache_key)
+        if cached:
+            return cached
+        
+        permissions = PermissionService.get_user_permissions(db, user_id, strict_mode=True)
+        roles = PermissionService.get_user_roles(db, user_id)
+        
+        result = {
+            "permissions": list(permissions),
+            "roles": [{"id": r.id, "name": r.name, "code": r.code} for r in roles]
+        }
+        
+        cache_manager.set("user_permissions", cache_key, result, ttl=60)
+        return result
     finally:
         db.close()
 
@@ -425,7 +464,7 @@ async def get_init_data(
     try:
         loop = asyncio.get_running_loop()
         
-        public_tasks = [
+        all_tasks = [
             loop.run_in_executor(executor, _get_site_configs_cached),
             loop.run_in_executor(executor, _get_categories_cached),
             loop.run_in_executor(executor, _get_tags_cached),
@@ -436,21 +475,28 @@ async def get_init_data(
             loop.run_in_executor(executor, _get_public_stats_cached),
         ]
         
-        public_results = await asyncio.gather(*public_tasks, return_exceptions=True)
+        if current_user:
+            all_tasks.extend([
+                loop.run_in_executor(executor, _get_user_profile_data, current_user.id, current_user.username),
+                loop.run_in_executor(executor, _get_user_interaction_data, current_user.id),
+                loop.run_in_executor(executor, _get_user_permissions_data, current_user.id),
+            ])
         
-        for i, result in enumerate(public_results):
+        all_results = await asyncio.gather(*all_tasks, return_exceptions=True)
+        
+        for i, result in enumerate(all_results):
             if isinstance(result, Exception):
                 logger.error(f"Task {i} failed: {result}")
-                public_results[i] = _get_default_for_task(i)
+                all_results[i] = _get_default_for_task(i)
         
-        site_config = public_results[0]
-        categories = public_results[1]
-        tags = public_results[2]
-        announcements = public_results[3]
-        articles = public_results[4]
-        featured_articles = public_results[5]
-        github_stats = public_results[6]
-        public_stats = public_results[7]
+        site_config = all_results[0]
+        categories = all_results[1]
+        tags = all_results[2]
+        announcements = all_results[3]
+        articles = all_results[4]
+        featured_articles = all_results[5]
+        github_stats = all_results[6]
+        public_stats = all_results[7]
         
         if isinstance(github_stats, dict) and github_stats.get("pending"):
             repo_url = github_stats.get("repo_url", "")
@@ -461,24 +507,23 @@ async def get_init_data(
         user_profile = None
         liked_article_ids = None
         bookmarked_article_ids = None
+        user_permissions = None
         
         if current_user:
-            user_tasks = [
-                loop.run_in_executor(executor, _get_user_profile_data, current_user.id, current_user.username),
-                loop.run_in_executor(executor, _get_user_interaction_data, current_user.id),
-            ]
+            if len(all_results) > 8 and not isinstance(all_results[8], Exception):
+                user_profile = all_results[8]
+            elif len(all_results) > 8:
+                logger.error(f"User profile task failed: {all_results[8]}")
             
-            user_results = await asyncio.gather(*user_tasks, return_exceptions=True)
+            if len(all_results) > 9 and not isinstance(all_results[9], Exception):
+                liked_article_ids, bookmarked_article_ids = all_results[9]
+            elif len(all_results) > 9:
+                logger.error(f"User interaction task failed: {all_results[9]}")
             
-            if not isinstance(user_results[0], Exception):
-                user_profile = user_results[0]
-            else:
-                logger.error(f"User profile task failed: {user_results[0]}")
-            
-            if not isinstance(user_results[1], Exception):
-                liked_article_ids, bookmarked_article_ids = user_results[1]
-            else:
-                logger.error(f"User interaction task failed: {user_results[1]}")
+            if len(all_results) > 10 and not isinstance(all_results[10], Exception):
+                user_permissions = UserPermissions(**all_results[10])
+            elif len(all_results) > 10:
+                logger.error(f"User permissions task failed: {all_results[10]}")
         
         return InitResponse(
             site_config=site_config,
@@ -491,7 +536,8 @@ async def get_init_data(
             public_stats=public_stats,
             user_profile=user_profile,
             liked_article_ids=liked_article_ids,
-            bookmarked_article_ids=bookmarked_article_ids
+            bookmarked_article_ids=bookmarked_article_ids,
+            user_permissions=user_permissions
         )
     except Exception as e:
         logger.exception(f"Init endpoint error: {e}")
@@ -517,5 +563,8 @@ def _get_default_for_task(task_index: int):
         PaginatedResponse(items=[], total=0, page=1, page_size=5, total_pages=0),  # featured_articles
         {"enabled": False, "stars": 0, "forks": 0, "watchers": 0, "open_issues": 0},  # github_stats
         PublicStats(total_articles=0, total_views=0, total_likes=0, total_comments=0),  # public_stats
+        None,  # user_profile
+        ([], []),  # user_interaction (liked_ids, bookmarked_ids)
+        {"permissions": [], "roles": []},  # user_permissions
     ]
     return defaults[task_index] if task_index < len(defaults) else None

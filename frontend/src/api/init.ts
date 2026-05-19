@@ -20,6 +20,11 @@ export interface PublicStats {
   total_comments: number
 }
 
+export interface UserPermissions {
+  permissions: string[]
+  roles: Array<{ id: number; name: string; code: string }>
+}
+
 export interface InitResponse {
   site_config: SiteConfig[]
   categories: Category[]
@@ -32,6 +37,7 @@ export interface InitResponse {
   user_profile: UserProfile | null
   liked_article_ids: number[] | null
   bookmarked_article_ids: number[] | null
+  user_permissions: UserPermissions | null
 }
 
 export const initApi = {

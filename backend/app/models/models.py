@@ -100,9 +100,13 @@ class ArticleLike(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     article_id = Column(Integer, ForeignKey('articles.id', ondelete='CASCADE'), nullable=False)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True)
     ip_address = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=get_db_now)
+    
+    __table_args__ = (
+        Index('ix_article_likes_user_article', 'user_id', 'article_id'),
+    )
 
 
 class ArticleBookmark(Base):

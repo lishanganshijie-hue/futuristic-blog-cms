@@ -6,6 +6,7 @@ from app.models import Article, ArticleLike, User, NotificationSettings
 from app.schemas import LikeResponse, ArticleListItem, PaginatedResponse, CategoryResponse, TagResponse, UserResponse
 from app.utils.auth import get_current_user_optional, get_current_user
 from app.services.email_service import EmailService
+from app.utils.cache import cache_manager
 from typing import Optional
 
 router = APIRouter(prefix="/likes", tags=["likes"])
@@ -142,6 +143,8 @@ async def toggle_like(
     
     db.commit()
     db.refresh(article)
+    
+    cache_manager.delete("user_interaction", f"user_interaction_{user_id}")
     
     return LikeResponse(
         article_id=article_id,

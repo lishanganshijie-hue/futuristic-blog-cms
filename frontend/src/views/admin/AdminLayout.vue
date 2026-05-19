@@ -13,6 +13,7 @@ const permissionStore = usePermissionStore()
 const dialog = useDialogStore()
 
 const isSidebarOpen = ref(false)
+const isLoadingPermission = ref(false)
 
 const allMenuItems = [
   { name: '仪表盘', path: '/admin', icon: 'dashboard', permission: 'dashboard.view' },
@@ -55,8 +56,13 @@ const currentRoutePermission = computed(() => {
 })
 
 const hasCurrentRoutePermission = computed(() => {
+  if (!permissionStore.isReady) return true
   if (!currentRoutePermission.value) return true
   return permissionStore.hasPermission(currentRoutePermission.value)
+})
+
+const isCheckingPermission = computed(() => {
+  return isLoadingPermission.value || (!permissionStore.isReady && authStore.isAuthenticated)
 })
 
 const isActive = (path: string) => {
@@ -128,9 +134,20 @@ const getLogoUrl = (url: string) => {
   return `/${url}`
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (authStore.isAuthenticated) {
     userProfileStore.fetchProfile()
+    
+    if (!permissionStore.isReady) {
+      isLoadingPermission.value = true
+      try {
+        await permissionStore.fetchMyPermissions()
+      } catch (error) {
+        console.error('Failed to load permissions:', error)
+      } finally {
+        isLoadingPermission.value = false
+      }
+    }
   }
 })
 </script>
@@ -598,7 +615,16 @@ onMounted(() => {
 
       <main class="flex-1 p-3 sm:p-4">
         <div
-          v-if="!hasCurrentRoutePermission"
+          v-if="isCheckingPermission"
+          class="min-h-[60vh] flex items-center justify-center"
+        >
+          <div class="flex flex-col items-center gap-4">
+            <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-gray-500 dark:text-gray-400">正在加载权限...</p>
+          </div>
+        </div>
+        <div
+          v-else-if="!hasCurrentRoutePermission"
           class="min-h-[60vh] flex items-center justify-center"
         >
           <div class="glass-card p-8 max-w-md w-full text-center">
