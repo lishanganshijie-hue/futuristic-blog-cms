@@ -5,6 +5,10 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://futuristic-blog-api-eh2x.onrender.com/api/:path*"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap-xml"
     },
