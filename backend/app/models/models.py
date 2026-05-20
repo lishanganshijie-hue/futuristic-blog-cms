@@ -328,7 +328,6 @@ class OperationLog(Base):
     user = relationship("User")
     
     __table_args__ = (
-        Index('ix_operation_logs_created_at', 'created_at'),
         Index('ix_operation_logs_user_id', 'user_id'),
         Index('ix_operation_logs_module', 'module'),
         Index('ix_operation_logs_status', 'status'),
@@ -355,7 +354,6 @@ class LoginLog(Base):
     user = relationship("User")
     
     __table_args__ = (
-        Index('ix_login_logs_created_at', 'created_at'),
         Index('ix_login_logs_user_id', 'user_id'),
         Index('ix_login_logs_status', 'status'),
         Index('ix_login_logs_login_type', 'login_type'),
@@ -381,7 +379,6 @@ class AccessLog(Base):
     user = relationship("User")
     
     __table_args__ = (
-        Index('ix_access_logs_created_at', 'created_at'),
         Index('ix_access_logs_user_id', 'user_id'),
         Index('ix_access_logs_ip_address', 'ip_address'),
         Index('ix_access_logs_request_path', 'request_path'),
