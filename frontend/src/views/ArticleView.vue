@@ -1613,6 +1613,12 @@ watch(article, async (newVal) => {
   -webkit-overflow-scrolling: touch;
   padding: 1rem;
   padding-top: 2.5rem;
+  white-space: pre;
+  word-wrap: normal;
+}
+
+.article-content :deep(.code-block-wrapper code) {
+  white-space: pre;
 }
 
 .article-content :deep(code) {
