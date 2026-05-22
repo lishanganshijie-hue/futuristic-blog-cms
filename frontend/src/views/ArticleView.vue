@@ -54,6 +54,7 @@ const coverImageUrl = computed(() => getMediaUrl(article.value?.cover_image))
 const activeHeading = ref('')
 const showToc = ref(false)
 const showMobileToc = ref(false)
+const mobileTocNavRef = ref<HTMLElement | null>(null)
 const coverImageHeight = ref<number>(0)
 const coverObjectPosition = ref<string>('center center')
 const articleHeaderRef = ref<HTMLElement | null>(null)
@@ -484,6 +485,17 @@ const handleFileLinkClick = (e: Event) => {
       }
     }
   }
+}
+
+const openMobileToc = () => {
+  showMobileToc.value = true
+  nextTick(() => {
+    if (!mobileTocNavRef.value || !activeHeading.value) return
+    const activeBtn = mobileTocNavRef.value.querySelector(`[data-mobile-heading-id="${activeHeading.value}"]`) as HTMLElement
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ block: 'center', behavior: 'instant' })
+    }
+  })
 }
 
 const scrollToHeading = (id: string) => {
@@ -1647,7 +1659,7 @@ watch(article, async (newVal) => {
       <button
         v-if="tocItems.length > 0"
         class="lg:hidden fixed right-4 bottom-32 z-40 w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-all active:scale-95"
-        @click="showMobileToc = true"
+        @click="openMobileToc"
       >
         <svg
           class="w-5 h-5"
@@ -1697,10 +1709,11 @@ watch(article, async (newVal) => {
                 </svg>
               </button>
             </div>
-            <nav class="overflow-y-auto overscroll-contain px-5 py-3 space-y-1 flex-1">
+            <nav ref="mobileTocNavRef" class="overflow-y-auto overscroll-contain px-5 py-3 space-y-1 flex-1">
               <button
                 v-for="item in tocItems"
                 :key="item.id"
+                :data-mobile-heading-id="item.id"
                 class="block w-full text-left text-sm py-2 transition-colors truncate"
                 :class="[
                   activeHeading === item.id ? 'text-primary font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200',
