@@ -53,6 +53,7 @@ const isTooltipVisible = (action: string) => {
 const coverImageUrl = computed(() => getMediaUrl(article.value?.cover_image))
 const activeHeading = ref('')
 const showToc = ref(false)
+const showMobileToc = ref(false)
 const coverImageHeight = ref<number>(0)
 const coverObjectPosition = ref<string>('center center')
 const articleHeaderRef = ref<HTMLElement | null>(null)
@@ -1642,6 +1643,77 @@ watch(article, async (newVal) => {
         <LeftSidebar />
         <BlogSidebar />
       </aside>
+
+      <button
+        v-if="tocItems.length > 0"
+        class="lg:hidden fixed right-4 bottom-32 z-40 w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-all active:scale-95"
+        @click="showMobileToc = true"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 6h16M4 10h16M4 14h10M4 18h7"
+          />
+        </svg>
+      </button>
+
+      <Teleport to="body">
+        <div
+          v-if="showMobileToc"
+          class="lg:hidden fixed inset-0 z-50"
+        >
+          <div
+            class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            @click="showMobileToc = false"
+          />
+          <div class="mobile-toc-drawer absolute bottom-0 left-0 right-0 bg-white dark:bg-dark-200 rounded-t-2xl max-h-[70vh] flex flex-col">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
+              <h3 class="text-base font-semibold text-gray-800 dark:text-gray-200">
+                目录
+              </h3>
+              <button
+                class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-300 text-gray-400"
+                @click="showMobileToc = false"
+              >
+                <svg
+                  class="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <nav class="overflow-y-auto overscroll-contain px-5 py-3 space-y-1 flex-1">
+              <button
+                v-for="item in tocItems"
+                :key="item.id"
+                class="block w-full text-left text-sm py-2 transition-colors truncate"
+                :class="[
+                  activeHeading === item.id ? 'text-primary font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200',
+                  item.level === 1 ? 'pl-0' : item.level === 2 ? 'pl-4' : item.level === 3 ? 'pl-8' : 'pl-12'
+                ]"
+                @click="scrollToHeading(item.id); showMobileToc = false"
+              >
+                {{ item.text }}
+              </button>
+            </nav>
+          </div>
+        </div>
+      </Teleport>
     </article>
 
     <div
@@ -1882,5 +1954,18 @@ watch(article, async (newVal) => {
 .article-content :deep(.mermaid svg) {
   width: 100%;
   height: auto;
+}
+
+.mobile-toc-drawer {
+  animation: mobile-toc-slide-up 0.25s ease-out;
+}
+
+@keyframes mobile-toc-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 </style>

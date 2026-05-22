@@ -3,8 +3,9 @@
     <button
       type="button"
       class="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-white/10 transition-colors relative"
+      data-tooltip-key="emoji"
       @click="showPicker = !showPicker"
-      @mouseenter="showTooltip = true"
+      @mouseenter="onEmojiHover"
       @mouseleave="showTooltip = false"
     >
       <svg
@@ -23,6 +24,7 @@
       <span
         v-if="showTooltip && !showPicker"
         class="action-tooltip"
+        :style="tooltipStyle"
       >
         选择表情
       </span>
@@ -88,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 
 const props = withDefaults(defineProps<{
   position?: 'top' | 'bottom'
@@ -102,7 +104,23 @@ const emit = defineEmits<{
 
 const showPicker = ref(false)
 const showTooltip = ref(false)
+const tooltipStyle = ref<Record<string, string>>({})
 const activeCategory = ref('smileys')
+
+const onEmojiHover = () => {
+  showTooltip.value = true
+  nextTick(() => {
+    const btn = document.querySelector('[data-tooltip-key="emoji"]') as HTMLElement
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    tooltipStyle.value = {
+      position: 'fixed',
+      bottom: `${window.innerHeight - rect.top + 8}px`,
+      left: `${rect.left + rect.width / 2}px`,
+      transform: 'translateX(-50%)',
+    }
+  })
+}
 
 const categories = [
   { name: 'smileys', icon: '😊', label: '表情' },
@@ -180,10 +198,6 @@ onUnmounted(() => {
 
 <style scoped>
 .action-tooltip {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
   padding: 4px 8px;
   background: #ffffff;
   color: #1a1a2e;
@@ -205,11 +219,9 @@ onUnmounted(() => {
 @keyframes tooltip-fade-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
   }
 }
 </style>

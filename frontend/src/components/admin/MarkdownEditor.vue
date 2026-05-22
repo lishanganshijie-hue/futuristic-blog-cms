@@ -287,9 +287,21 @@ const markAsSaved = () => {
 }
 
 const activeTooltip = ref<string | null>(null)
+const tooltipStyle = ref<Record<string, string>>({})
 
 const showTooltip = (name: string) => {
   activeTooltip.value = name
+  nextTick(() => {
+    const btn = document.querySelector(`[data-tooltip-key="${name}"]`) as HTMLElement
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    tooltipStyle.value = {
+      position: 'fixed',
+      bottom: `${window.innerHeight - rect.top + 8}px`,
+      left: `${rect.left + rect.width / 2}px`,
+      transform: 'translateX(-50%)',
+    }
+  })
 }
 
 const hideTooltip = () => {
@@ -404,6 +416,7 @@ defineExpose({
           v-if="!item.divider"
           type="button"
           class="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-primary hover:bg-gray-200 dark:hover:bg-white/5 rounded transition-colors relative"
+          :data-tooltip-key="item.key"
           @click="item.action"
           @mouseenter="item.key && showTooltip(item.key)"
           @mouseleave="hideTooltip"
@@ -412,6 +425,7 @@ defineExpose({
           <span
             v-if="activeTooltip === item.key"
             class="action-tooltip"
+            :style="tooltipStyle"
           >
             {{ item.title }}
           </span>
@@ -426,6 +440,7 @@ defineExpose({
         <button
           type="button"
           class="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-primary hover:bg-gray-200 dark:hover:bg-white/5 rounded transition-colors relative"
+          data-tooltip-key="codeblock"
           @click="showLangSelector = !showLangSelector; if (showLangSelector) updateLangSelectorPosition()"
           @mouseenter="showTooltip('codeblock')"
           @mouseleave="hideTooltip"
@@ -434,6 +449,7 @@ defineExpose({
           <span
             v-if="activeTooltip === 'codeblock'"
             class="action-tooltip"
+            :style="tooltipStyle"
           >
             代码块
           </span>
@@ -471,6 +487,7 @@ defineExpose({
       <button
         type="button"
         class="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-primary hover:bg-gray-200 dark:hover:bg-white/5 rounded transition-colors relative"
+        data-tooltip-key="help"
         @click="showMarkdownHelp = !showMarkdownHelp"
         @mouseenter="showTooltip('help')"
         @mouseleave="hideTooltip"
@@ -479,6 +496,7 @@ defineExpose({
         <span
           v-if="activeTooltip === 'help'"
           class="action-tooltip"
+          :style="tooltipStyle"
         >
           Markdown 语法帮助
         </span>
@@ -487,6 +505,7 @@ defineExpose({
         type="button"
         class="px-2 py-1 text-xs font-medium rounded transition-colors relative"
         :class="showPreview ? 'text-primary bg-primary/10' : 'text-gray-600 dark:text-gray-400 hover:text-primary hover:bg-gray-200 dark:hover:bg-white/5'"
+        data-tooltip-key="preview"
         @click="togglePreview"
         @mouseenter="showTooltip('preview')"
         @mouseleave="hideTooltip"
@@ -495,6 +514,7 @@ defineExpose({
         <span
           v-if="activeTooltip === 'preview'"
           class="action-tooltip"
+          :style="tooltipStyle"
         >
           {{ showPreview ? '隐藏预览' : '显示预览' }}
         </span>
@@ -502,6 +522,7 @@ defineExpose({
       <button
         type="button"
         class="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-primary hover:bg-gray-200 dark:hover:bg-white/5 rounded transition-colors relative"
+        data-tooltip-key="fullscreen"
         @click="toggleFullscreen"
         @mouseenter="showTooltip('fullscreen')"
         @mouseleave="hideTooltip"
@@ -510,6 +531,7 @@ defineExpose({
         <span
           v-if="activeTooltip === 'fullscreen'"
           class="action-tooltip"
+          :style="tooltipStyle"
         >
           {{ isFullscreen ? '退出全屏' : '全屏' }}
         </span>
@@ -829,10 +851,6 @@ defineExpose({
 }
 
 .action-tooltip {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
   padding: 4px 8px;
   background: #ffffff;
   color: #1a1a2e;
@@ -854,11 +872,9 @@ defineExpose({
 @keyframes tooltip-fade-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
   }
 }
 </style>
