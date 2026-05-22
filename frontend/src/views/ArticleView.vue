@@ -1764,6 +1764,10 @@ watch(article, async (newVal) => {
   margin-bottom: 0.5rem;
 }
 
+.article-content :deep(.code-block-wrapper code) {
+  white-space: pre;
+}
+
 .article-content :deep(code) {
   @apply text-sm font-mono;
 }

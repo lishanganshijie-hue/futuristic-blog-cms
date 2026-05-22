@@ -364,11 +364,16 @@ watch(() => themeStore.isDark, (isDark) => {
   border-radius: 0.375rem;
   padding: 0.75rem;
   overflow-x: auto;
-  overflow-y: clip;
+  overflow-y: hidden;
   margin: 0.5rem 0;
   white-space: pre;
+  word-wrap: normal;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+.comment-markdown-preview :deep(pre code) {
+  white-space: pre;
 }
 
 .comment-markdown-preview :deep(.code-block-wrapper) {

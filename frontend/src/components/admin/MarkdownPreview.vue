@@ -420,10 +420,16 @@ defineExpose({
   border-radius: 0.5rem;
   padding: 1rem;
   overflow-x: auto;
-  overflow-y: clip;
+  overflow-y: hidden;
   margin: 1rem 0;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  white-space: pre;
+  word-wrap: normal;
+}
+
+.preview-content :deep(pre code) {
+  white-space: pre;
 }
 
 .preview-content :deep(.code-block-wrapper) {

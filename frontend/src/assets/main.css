@@ -248,13 +248,16 @@
 pre {
   @apply bg-gray-50 dark:bg-dark-300 rounded-lg p-4 border border-gray-200 dark:border-white/5;
   overflow-x: auto;
-  overflow-y: clip;
+  overflow-y: hidden;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  white-space: pre;
+  word-wrap: normal;
 }
 
 pre code {
   @apply text-sm font-mono;
+  white-space: pre;
 }
 
 .hljs {
