@@ -77,17 +77,32 @@ export default defineConfig({
             if (id.includes('echarts') || id.includes('zrender')) {
               return 'echarts'
             }
+            if (id.includes('mermaid')) {
+              return 'mermaid'
+            }
             if (id.includes('marked') || id.includes('highlight.js') || id.includes('dompurify')) {
               return 'markdown'
+            }
+            if (id.includes('pdfjs')) {
+              return 'pdfjs'
+            }
+            if (id.includes('xlsx') || id.includes('jszip')) {
+              return 'xlsx'
+            }
+            if (id.includes('mammoth')) {
+              return 'mammoth'
             }
             if (id.includes('axios')) {
               return 'axios'
             }
-            if (id.includes('pdfjs') || id.includes('mammoth') || id.includes('xlsx') || id.includes('jszip')) {
-              return 'document-libs'
-            }
             if (id.includes('cropperjs')) {
               return 'cropperjs'
+            }
+            if (id.includes('particles.js')) {
+              return 'particles'
+            }
+            if (id.includes('@vueuse')) {
+              return 'vueuse'
             }
             return 'vendor'
           }
@@ -110,7 +125,7 @@ export default defineConfig({
         }
       }
     },
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 2000,
     cssCodeSplit: true,
     sourcemap: false,
     reportCompressedSize: true,

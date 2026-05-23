@@ -3,9 +3,10 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from '@/utils/hljs'
 import DOMPurify from 'dompurify'
+import mermaid from 'mermaid'
 import { useRoute, useRouter } from 'vue-router'
 import { articleApi, likeApi, bookmarkApi, fileApi } from '@/api'
-import { useAuthStore, useUserInteractionStore } from '@/stores'
+import { useAuthStore, useUserInteractionStore, useThemeStore } from '@/stores'
 import { dataPrefetch } from '@/utils/prefetch'
 import type { Article, ArticleFile } from '@/types'
 import CommentSection from '@/components/comments/CommentSection.vue'
@@ -17,6 +18,7 @@ import { getMediaUrl } from '@/utils/media'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const themeStore = useThemeStore()
 const userInteractionStore = useUserInteractionStore()
 const article = ref<Article | null>(null)
 const loading = ref(true)
@@ -51,6 +53,8 @@ const isTooltipVisible = (action: string) => {
 const coverImageUrl = computed(() => getMediaUrl(article.value?.cover_image))
 const activeHeading = ref('')
 const showToc = ref(false)
+const showMobileToc = ref(false)
+const mobileTocNavRef = ref<HTMLElement | null>(null)
 const coverImageHeight = ref<number>(0)
 const coverObjectPosition = ref<string>('center center')
 const articleHeaderRef = ref<HTMLElement | null>(null)
@@ -87,17 +91,29 @@ const highlightText = (text: string, keyword: string): string => {
 const renderer = new marked.Renderer()
 
 renderer.code = (code: string, infostring: string | undefined, _escaped: boolean) => {
+  if (infostring === 'mermaid') {
+    const encodedCode = encodeURIComponent(code)
+    const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`
+    const langIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>`
+    return `<div class="code-block-wrapper relative group mermaid-wrapper" data-mermaid="${encodedCode}">
+      <div class="absolute top-2 left-4 right-2 flex justify-between items-center z-20">
+        <span class="text-sm text-gray-500 dark:text-gray-400">${langIcon}mermaid</span>
+        <button class="copy-code-btn flex items-center justify-center w-8 h-8 rounded text-gray-500 hover:text-primary transition-colors" data-code="${encodedCode}">${copyIcon}</button>
+      </div>
+      <pre class="mermaid" data-mermaid-code="${encodedCode}">${code}</pre>
+    </div>`
+  }
   const validLang = infostring && hljs.getLanguage(infostring) ? infostring : 'plaintext'
   const highlighted = hljs.highlight(code, { language: validLang }).value
   const encodedCode = encodeURIComponent(code)
   const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`
   const langIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>`
   return `<div class="code-block-wrapper relative group">
-    <div class="absolute top-3 left-4 right-2 flex justify-between items-center z-20">
+    <div class="absolute top-2 left-4 right-2 flex justify-between items-center z-20">
       <span class="text-sm text-gray-500 dark:text-gray-400">${langIcon}${validLang}</span>
       <button class="copy-code-btn flex items-center justify-center w-8 h-8 rounded text-gray-500 hover:text-primary transition-colors" data-code="${encodedCode}">${copyIcon}</button>
     </div>
-    <pre class="mt-6"><code class="hljs language-${validLang}">${highlighted}</code></pre>
+    <pre><code class="hljs language-${validLang}">${highlighted}</code></pre>
   </div>`
 }
 
@@ -121,7 +137,7 @@ const renderedContent = computed(() => {
   if (!article.value?.content) return ''
   const rawHtml = marked.parse(article.value.content, { async: false }) as string
   let sanitizedHtml = DOMPurify.sanitize(rawHtml, {
-    ADD_ATTR: ['target', 'rel', 'loading', 'class', 'id'],
+    ADD_ATTR: ['target', 'rel', 'loading', 'class', 'id', 'data-mermaid', 'data-mermaid-code'],
     ADD_TAGS: ['iframe', 'mark']
   })
   
@@ -471,6 +487,17 @@ const handleFileLinkClick = (e: Event) => {
   }
 }
 
+const openMobileToc = () => {
+  showMobileToc.value = true
+  nextTick(() => {
+    if (!mobileTocNavRef.value || !activeHeading.value) return
+    const activeBtn = mobileTocNavRef.value.querySelector(`[data-mobile-heading-id="${activeHeading.value}"]`) as HTMLElement
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ block: 'center', behavior: 'instant' })
+    }
+  })
+}
+
 const scrollToHeading = (id: string) => {
   const element = document.getElementById(id)
   if (element) {
@@ -536,6 +563,7 @@ const loadArticle = async (slug: string) => {
     }
     likeCount.value = article.value?.like_count || 0
     isLiked.value = article.value?.is_liked || false
+    bookmarkCount.value = article.value?.bookmark_count || 0
     if (article.value?.id) {
       if (article.value.files && article.value.files.length > 0) {
         articleFiles.value = [...article.value.files].sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -563,10 +591,59 @@ const loadArticle = async (slug: string) => {
     }
   } finally {
     loading.value = false
+    nextTick(async () => {
+      const mermaidElements = document.querySelectorAll('.mermaid')
+      for (let i = 0; i < mermaidElements.length; i++) {
+        const el = mermaidElements[i] as HTMLElement
+        const id = `mermaid-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`
+        try {
+          const { svg } = await mermaid.render(id, el.textContent || '')
+          el.innerHTML = svg
+        } catch {}
+      }
+    })
   }
 }
 
 onMounted(async () => {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: themeStore.isDark ? 'dark' : 'default',
+    securityLevel: 'loose',
+    flowchart: {
+      useMaxWidth: false,
+      htmlLabels: true,
+      curve: 'basis',
+      padding: 15
+    },
+    sequence: {
+      useMaxWidth: false,
+      actorMargin: 50,
+      boxMargin: 10,
+      boxTextMargin: 5,
+      noteMargin: 10,
+      messageMargin: 35,
+      mirrorActors: true,
+      bottomMarginAdj: 1
+    },
+    gantt: {
+      useMaxWidth: false,
+      leftPadding: 75,
+      gridLineStartPadding: 35,
+      barHeight: 20,
+      barGap: 4,
+      topPadding: 50,
+      fontSize: 14,
+      sectionFontSize: 14,
+      numberSectionStyles: 4,
+      axisFormat: '%Y-%m-%d'
+    },
+    themeVariables: {
+      fontSize: '20px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }
+  })
+  
   document.addEventListener('click', handleCopyCode)
   document.addEventListener('click', handleFileLinkClick)
   window.addEventListener('scroll', updateActiveHeading, { passive: true })
@@ -627,6 +704,82 @@ watch(() => route.params.slug, async (newSlug, oldSlug) => {
     const highlight = route.query.highlight as string
     highlightKeyword.value = highlight || ''
     await loadArticle(newSlug as string)
+  }
+})
+
+watch(() => themeStore.isDark, (isDark) => {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: isDark ? 'dark' : 'default',
+    securityLevel: 'loose',
+    flowchart: {
+      useMaxWidth: false,
+      htmlLabels: true,
+      curve: 'basis',
+      padding: 15
+    },
+    sequence: {
+      useMaxWidth: false,
+      actorMargin: 50,
+      boxMargin: 10,
+      boxTextMargin: 5,
+      noteMargin: 10,
+      messageMargin: 35,
+      mirrorActors: true,
+      bottomMarginAdj: 1
+    },
+    gantt: {
+      useMaxWidth: false,
+      leftPadding: 75,
+      gridLineStartPadding: 35,
+      barHeight: 20,
+      barGap: 4,
+      topPadding: 50,
+      fontSize: 14,
+      sectionFontSize: 14,
+      numberSectionStyles: 4,
+      axisFormat: '%Y-%m-%d'
+    },
+    themeVariables: {
+      fontSize: '20px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }
+  })
+  
+  const mermaidElements = document.querySelectorAll('.article-content .mermaid')
+  if (mermaidElements.length > 0) {
+    mermaidElements.forEach((el) => {
+      const pre = el as HTMLElement
+      const oldSvg = pre.querySelector('svg')
+      const encodedCode = pre.getAttribute('data-mermaid-code')
+      
+      if (oldSvg && encodedCode) {
+        oldSvg.style.opacity = '0.6'
+        
+        const tempDiv = document.createElement('div')
+        tempDiv.style.position = 'absolute'
+        tempDiv.style.visibility = 'hidden'
+        tempDiv.style.pointerEvents = 'none'
+        document.body.appendChild(tempDiv)
+        
+        const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        
+        mermaid.render(id, decodeURIComponent(encodedCode)).then(({ svg }) => {
+          pre.innerHTML = svg
+          const finalSvg = pre.querySelector('svg')
+          if (finalSvg) {
+            finalSvg.style.opacity = '0'
+            requestAnimationFrame(() => {
+              if (finalSvg) {
+                finalSvg.style.transition = 'opacity 0.15s ease'
+                finalSvg.style.opacity = '1'
+              }
+            })
+          }
+          document.body.removeChild(tempDiv)
+        })
+      }
+    })
   }
 })
 
@@ -1503,6 +1656,78 @@ watch(article, async (newVal) => {
         <LeftSidebar />
         <BlogSidebar />
       </aside>
+
+      <button
+        v-if="tocItems.length > 0"
+        class="lg:hidden fixed right-4 bottom-32 md:right-5 md:bottom-36 z-40 w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-all active:scale-95"
+        @click="openMobileToc"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 6h16M4 10h16M4 14h10M4 18h7"
+          />
+        </svg>
+      </button>
+
+      <Teleport to="body">
+        <div
+          v-if="showMobileToc"
+          class="lg:hidden fixed inset-0 z-50"
+        >
+          <div
+            class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            @click="showMobileToc = false"
+          />
+          <div class="mobile-toc-drawer absolute bottom-0 left-0 right-0 bg-white dark:bg-dark-200 rounded-t-2xl max-h-[70vh] flex flex-col">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
+              <h3 class="text-base font-semibold text-gray-800 dark:text-gray-200">
+                目录
+              </h3>
+              <button
+                class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-300 text-gray-400"
+                @click="showMobileToc = false"
+              >
+                <svg
+                  class="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <nav ref="mobileTocNavRef" class="overflow-y-auto overscroll-contain px-5 py-3 space-y-1 flex-1">
+              <button
+                v-for="item in tocItems"
+                :key="item.id"
+                :data-mobile-heading-id="item.id"
+                class="block w-full text-left text-sm py-2 transition-colors truncate"
+                :class="[
+                  activeHeading === item.id ? 'text-primary font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200',
+                  item.level === 1 ? 'pl-0' : item.level === 2 ? 'pl-4' : item.level === 3 ? 'pl-8' : 'pl-12'
+                ]"
+                @click="scrollToHeading(item.id); showMobileToc = false"
+              >
+                {{ item.text }}
+              </button>
+            </nav>
+          </div>
+        </div>
+      </Teleport>
     </article>
 
     <div
@@ -1608,11 +1833,25 @@ watch(article, async (newVal) => {
 }
 
 .article-content :deep(.code-block-wrapper pre) {
-  @apply bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden my-4 border border-gray-200 dark:border-white/5;
+  @apply bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   padding: 1rem;
   padding-top: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.article-content :deep(.code-block-wrapper pre.mermaid) {
+  @apply bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem;
+  padding-top: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.article-content :deep(.code-block-wrapper code) {
+  white-space: pre;
 }
 
 .article-content :deep(code) {
@@ -1711,6 +1950,36 @@ watch(article, async (newVal) => {
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+}
+
+.article-content :deep(.mermaid-wrapper) {
+  @apply flex justify-center;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.article-content :deep(.mermaid) {
+  @apply flex justify-center bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.article-content :deep(.mermaid svg) {
+  width: 100%;
+  height: auto;
+}
+
+.mobile-toc-drawer {
+  animation: mobile-toc-slide-up 0.25s ease-out;
+}
+
+@keyframes mobile-toc-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
   }
 }
 </style>

@@ -3,6 +3,8 @@ import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from '@/utils/hljs'
 import DOMPurify from 'dompurify'
+import mermaid from 'mermaid'
+import { useThemeStore } from '@/stores'
 
 const props = defineProps<{
   content: string
@@ -12,6 +14,7 @@ const emit = defineEmits<{
   (e: 'scroll', scrollTop: number): void
 }>()
 
+const themeStore = useThemeStore()
 const previewRef = ref<HTMLElement | null>(null)
 const isRendering = ref(false)
 const renderedHtml = ref('')
@@ -19,6 +22,19 @@ const renderedHtml = ref('')
 const renderer = new marked.Renderer()
 
 renderer.code = (code: string, infostring: string | undefined, _escaped: boolean) => {
+  if (infostring === 'mermaid') {
+    const encodedCode = encodeURIComponent(code)
+    const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`
+    const langIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>`
+    return `<div class="code-block-wrapper relative group mermaid-wrapper" data-mermaid="${encodedCode}">
+      <div class="absolute top-6 left-4 right-2 flex justify-between items-center z-20">
+        <span class="text-sm text-gray-500 dark:text-gray-400">${langIcon}mermaid</span>
+        <button class="copy-code-btn flex items-center justify-center w-8 h-8 rounded text-gray-500 hover:text-primary transition-colors" data-code="${encodedCode}">${copyIcon}</button>
+      </div>
+      <pre class="mermaid" data-mermaid-code="${encodedCode}">${code}</pre>
+    </div>`
+  }
+  
   let validLang = 'plaintext'
   
   if (infostring) {
@@ -49,11 +65,11 @@ renderer.code = (code: string, infostring: string | undefined, _escaped: boolean
   const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`
   const langIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>`
   return `<div class="code-block-wrapper relative group">
-    <div class="absolute top-3 left-4 right-2 flex justify-between items-center z-20">
+    <div class="absolute top-2 left-4 right-2 flex justify-between items-center z-20">
       <span class="text-sm text-gray-500 dark:text-gray-400">${langIcon}${validLang}</span>
       <button class="copy-code-btn flex items-center justify-center w-8 h-8 rounded text-gray-500 hover:text-primary transition-colors" data-code="${encodedCode}">${copyIcon}</button>
     </div>
-    <pre style="padding-top: 2.5rem !important;"><code class="hljs language-${validLang}">${highlighted}</code></pre>
+    <pre><code class="hljs language-${validLang}">${highlighted}</code></pre>
   </div>`
 }
 
@@ -122,7 +138,7 @@ const renderMarkdown = () => {
   try {
     const rawHtml = marked.parse(props.content, { async: false }) as string
     renderedHtml.value = DOMPurify.sanitize(rawHtml, {
-      ADD_ATTR: ['target', 'rel', 'loading', 'class'],
+      ADD_ATTR: ['target', 'rel', 'loading', 'class', 'data-mermaid', 'data-mermaid-code'],
       ADD_TAGS: ['iframe']
     })
   } catch (error) {
@@ -130,9 +146,18 @@ const renderMarkdown = () => {
     renderedHtml.value = ''
   }
   
-  nextTick(() => {
-    isRendering.value = false
-  })
+  nextTick(async () => {
+      isRendering.value = false
+      const mermaidElements = document.querySelectorAll('.preview-content .mermaid')
+      for (let i = 0; i < mermaidElements.length; i++) {
+        const el = mermaidElements[i] as HTMLElement
+        const id = `mermaid-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`
+        try {
+          const { svg } = await mermaid.render(id, el.textContent || '')
+          el.innerHTML = svg
+        } catch {}
+      }
+    })
 }
 
 watch(() => props.content, () => {
@@ -172,8 +197,98 @@ const handleCopyCode = (e: MouseEvent) => {
 }
 
 onMounted(() => {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: themeStore.isDark ? 'dark' : 'default',
+    securityLevel: 'loose',
+    flowchart: {
+      useMaxWidth: false,
+      htmlLabels: true,
+      curve: 'basis',
+      padding: 15
+    },
+    sequence: {
+      useMaxWidth: false,
+      actorMargin: 50,
+      boxMargin: 10,
+      boxTextMargin: 5,
+      noteMargin: 10,
+      messageMargin: 35,
+      mirrorActors: true,
+      bottomMarginAdj: 1
+    },
+    themeVariables: {
+      fontSize: '20px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }
+  })
+  
   if (previewRef.value) {
     previewRef.value.addEventListener('click', handleCopyCode)
+  }
+})
+
+watch(() => themeStore.isDark, (isDark) => {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: isDark ? 'dark' : 'default',
+    securityLevel: 'loose',
+    flowchart: {
+      useMaxWidth: false,
+      htmlLabels: true,
+      curve: 'basis',
+      padding: 15
+    },
+    sequence: {
+      useMaxWidth: false,
+      actorMargin: 50,
+      boxMargin: 10,
+      boxTextMargin: 5,
+      noteMargin: 10,
+      messageMargin: 35,
+      mirrorActors: true,
+      bottomMarginAdj: 1
+    },
+    themeVariables: {
+      fontSize: '20px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }
+  })
+  
+  const mermaidElements = document.querySelectorAll('.preview-content .mermaid')
+  if (mermaidElements.length > 0) {
+    mermaidElements.forEach((el) => {
+      const pre = el as HTMLElement
+      const oldSvg = pre.querySelector('svg')
+      const encodedCode = pre.getAttribute('data-mermaid-code')
+      
+      if (oldSvg && encodedCode) {
+        oldSvg.style.opacity = '0.6'
+        
+        const tempDiv = document.createElement('div')
+        tempDiv.style.position = 'absolute'
+        tempDiv.style.visibility = 'hidden'
+        tempDiv.style.pointerEvents = 'none'
+        document.body.appendChild(tempDiv)
+        
+        const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        
+        mermaid.render(id, decodeURIComponent(encodedCode)).then(({ svg }) => {
+          pre.innerHTML = svg
+          const finalSvg = pre.querySelector('svg')
+          if (finalSvg) {
+            finalSvg.style.opacity = '0'
+            requestAnimationFrame(() => {
+              if (finalSvg) {
+                finalSvg.style.transition = 'opacity 0.15s ease'
+                finalSvg.style.opacity = '1'
+              }
+            })
+          }
+          document.body.removeChild(tempDiv)
+        })
+      }
+    })
   }
 })
 
@@ -222,7 +337,7 @@ defineExpose({
     </div>
     <div 
       ref="previewRef"
-      class="preview-content flex-1 overflow-auto p-4 prose prose-invert max-w-none"
+      class="preview-content flex-1 overflow-auto p-4 prose dark:prose-invert max-w-none"
       @scroll="handleScroll"
       v-html="renderedHtml"
     />
@@ -231,7 +346,7 @@ defineExpose({
 
 <style scoped>
 .markdown-preview-container {
-  background: var(--bg-color, #1a1a2e);
+  @apply bg-white dark:bg-dark-200;
 }
 
 .preview-content {
@@ -243,7 +358,7 @@ defineExpose({
   font-weight: 700;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  @apply border-b border-gray-200 dark:border-white/10;
 }
 
 .preview-content :deep(h2) {
@@ -252,7 +367,7 @@ defineExpose({
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
   padding-bottom: 0.25rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  @apply border-b border-gray-200 dark:border-white/5;
 }
 
 .preview-content :deep(h3) {
@@ -279,7 +394,7 @@ defineExpose({
 }
 
 .preview-content :deep(a) {
-  color: #00d4ff;
+  @apply text-primary;
   text-decoration: none;
   transition: all 0.2s;
   word-break: break-word;
@@ -292,8 +407,7 @@ defineExpose({
 }
 
 .preview-content :deep(code:not(.hljs)) {
-  background: rgba(0, 212, 255, 0.1);
-  color: #00d4ff;
+  @apply bg-primary/10 text-primary;
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
   font-size: 0.875em;
@@ -302,18 +416,48 @@ defineExpose({
 }
 
 .preview-content :deep(pre) {
-  background: #0d0d1a;
+  @apply bg-gray-100 dark:bg-dark-300;
   border-radius: 0.5rem;
   padding: 1rem;
   overflow-x: auto;
-  overflow-y: clip;
+  overflow-y: hidden;
   margin: 1rem 0;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  white-space: pre;
+  word-wrap: normal;
+}
+
+.preview-content :deep(pre code) {
+  white-space: pre;
 }
 
 .preview-content :deep(.code-block-wrapper) {
   position: relative;
+}
+
+.preview-content :deep(.code-block-wrapper pre) {
+  @apply bg-gray-100 dark:bg-dark-300;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  padding-top: 2.5rem;
+  overflow-x: auto;
+  overflow-y: clip;
+  margin-bottom: 1rem;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.preview-content :deep(.code-block-wrapper pre.mermaid) {
+  @apply bg-gray-100 dark:bg-dark-300;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  padding-top: 2.5rem;
+  overflow-x: auto;
+  overflow-y: clip;
+  margin-bottom: 1rem;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .preview-content :deep(.hljs) {
@@ -322,10 +466,10 @@ defineExpose({
 }
 
 .preview-content :deep(blockquote) {
-  border-left: 4px solid #00d4ff;
+  @apply border-l-4 border-primary;
   padding-left: 1rem;
   margin: 1rem 0;
-  color: #9ca3af;
+  @apply text-gray-500 dark:text-gray-400;
   font-style: italic;
 }
 
@@ -359,7 +503,7 @@ defineExpose({
 
 .preview-content :deep(hr) {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  @apply border-t border-gray-200 dark:border-white/10;
   margin: 2rem 0;
 }
 
@@ -378,20 +522,20 @@ defineExpose({
 
 .preview-content :deep(th),
 .preview-content :deep(td) {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  @apply border border-gray-200 dark:border-white/10;
   padding: 0.5rem 1rem;
   text-align: left;
   white-space: nowrap;
 }
 
 .preview-content :deep(th) {
-  background: rgba(0, 212, 255, 0.1);
+  @apply bg-primary/10;
   font-weight: 600;
 }
 
 .preview-content :deep(strong) {
   font-weight: 600;
-  color: #fff;
+  @apply text-gray-900 dark:text-white;
 }
 
 .preview-content :deep(em) {
@@ -400,7 +544,7 @@ defineExpose({
 
 .preview-content :deep(del) {
   text-decoration: line-through;
-  color: #9ca3af;
+  @apply text-gray-500 dark:text-gray-400;
 }
 
 @media (max-width: 768px) {
@@ -618,5 +762,23 @@ defineExpose({
     padding: 0.2rem 0.25rem;
     font-size: 11px;
   }
+}
+
+.preview-content :deep(.mermaid-wrapper) {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+
+.preview-content :deep(.mermaid) {
+  @apply flex justify-center bg-gray-100 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/10;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.preview-content :deep(.mermaid svg) {
+  width: 100%;
+  height: auto;
 }
 </style>

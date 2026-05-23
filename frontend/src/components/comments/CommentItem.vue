@@ -222,7 +222,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, inject, watch, type Ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject, watch, nextTick, type Ref } from 'vue'
+import mermaid from 'mermaid'
 import { useAuthStore } from '@/stores/auth'
 import type { Comment } from '@/types'
 import CommentMarkdownPreview from './CommentMarkdownPreview.vue'
@@ -251,6 +252,7 @@ const isExpanded = ref(false)
 const contentRef = ref<HTMLElement | null>(null)
 const shouldShowExpand = ref(false)
 const showReplies = ref(false)
+let resizeObserver: ResizeObserver | null = null
 
 const expandedCommentIds = inject<Ref<Record<number, boolean>>>('expandedCommentIds')
 
@@ -268,6 +270,25 @@ watch(shouldAutoExpand, (newVal) => {
 watch(showReplies, (newVal) => {
   if (!newVal && expandedCommentIds && expandedCommentIds.value && props.depth === 0) {
     delete expandedCommentIds.value[props.comment.id]
+  }
+  
+  if (newVal) {
+    nextTick(async () => {
+      const mermaidElements = document.querySelectorAll('.comment-item .mermaid:not([data-rendered])')
+      for (let i = 0; i < mermaidElements.length; i++) {
+        const el = mermaidElements[i] as HTMLElement
+        el.setAttribute('data-rendered', 'true')
+        
+        const id = `mermaid-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`
+        
+        try {
+          const { svg } = await mermaid.render(id, el.textContent || '')
+          el.innerHTML = svg
+        } catch {
+          el.removeAttribute('data-rendered')
+        }
+      }
+    })
   }
 })
 
@@ -327,6 +348,20 @@ onMounted(() => {
   checkContentHeight()
   if (shouldAutoExpand.value && props.depth === 0) {
     showReplies.value = true
+  }
+  
+  if (contentRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      checkContentHeight()
+    })
+    resizeObserver.observe(contentRef.value)
+  }
+})
+
+onUnmounted(() => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
   }
 })
 

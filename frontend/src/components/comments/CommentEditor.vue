@@ -60,6 +60,7 @@ const programmingLanguages = [
   { code: 'json', label: 'JSON', alias: 'json' },
   { code: 'yaml', label: 'YAML', alias: 'yml' },
   { code: 'markdown', label: 'Markdown', alias: 'md' },
+  { code: 'mermaid', label: 'Mermaid', alias: 'mermaid' },
   { code: 'plaintext', label: 'Plain Text', alias: 'text' },
 ]
 
