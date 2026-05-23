@@ -208,10 +208,7 @@ onMounted(async () => {
   
   nextTick(() => {
     if (previewRef.value) {
-      const rect = previewRef.value.getBoundingClientRect()
-      if (rect.width > 0 && rect.height > 0) {
-        renderMermaidDiagrams(previewRef.value, '.mermaid', themeStore.isDark)
-      }
+      renderMermaidDiagrams(previewRef.value, '.mermaid', themeStore.isDark)
     }
   })
 })

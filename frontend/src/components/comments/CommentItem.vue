@@ -1,6 +1,7 @@
 <template>
   <div 
     :id="`comment-${comment.id}`"
+    ref="commentItemRef"
     class="comment-item bg-gray-100 dark:bg-dark-100/30 border border-gray-200 dark:border-white/5 rounded-lg p-4 transition-all duration-300"
   >
     <div class="flex gap-3">
@@ -252,6 +253,7 @@ const submittingReply = ref(false)
 const replyEditorRef = ref<InstanceType<typeof CommentEditor> | null>(null)
 const isExpanded = ref(false)
 const contentRef = ref<HTMLElement | null>(null)
+const commentItemRef = ref<HTMLElement | null>(null)
 const shouldShowExpand = ref(false)
 const showReplies = ref(false)
 let resizeObserver: ResizeObserver | null = null
@@ -276,10 +278,9 @@ watch(showReplies, (newVal) => {
   
   if (newVal) {
     nextTick(async () => {
-      const commentItem = document.querySelector('.comment-item')
-      if (commentItem) {
+      if (commentItemRef.value) {
         await initMermaid(themeStore.isDark)
-        await renderMermaidDiagrams(commentItem as HTMLElement, '.mermaid:not([data-rendered])', themeStore.isDark)
+        await renderMermaidDiagrams(commentItemRef.value, '.mermaid', themeStore.isDark)
       }
     })
   }
