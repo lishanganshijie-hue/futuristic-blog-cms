@@ -563,6 +563,7 @@ const loadArticle = async (slug: string) => {
     }
     likeCount.value = article.value?.like_count || 0
     isLiked.value = article.value?.is_liked || false
+    bookmarkCount.value = article.value?.bookmark_count || 0
     if (article.value?.id) {
       if (article.value.files && article.value.files.length > 0) {
         articleFiles.value = [...article.value.files].sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -1658,7 +1659,7 @@ watch(article, async (newVal) => {
 
       <button
         v-if="tocItems.length > 0"
-        class="lg:hidden fixed right-4 bottom-32 z-40 w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-all active:scale-95"
+        class="lg:hidden fixed right-4 bottom-32 md:right-5 md:bottom-36 z-40 w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-all active:scale-95"
         @click="openMobileToc"
       >
         <svg
