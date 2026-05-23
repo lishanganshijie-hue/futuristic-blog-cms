@@ -1192,16 +1192,7 @@ async def get_performance_stats():
 
 @app.get("/api/cache-stats")
 async def get_cache_stats():
-    return cache_manager.get_usage_report()
-
-
-@app.post("/api/cache/clear")
-async def clear_cache(cache_name: str = None):
-    if cache_name:
-        cache_manager.clear_cache(cache_name)
-        return {"message": f"Cache '{cache_name}' cleared"}
-    cache_manager.clear_all()
-    return {"message": "All caches cleared"}
+    return cache_manager.get_all_stats()
 
 
 @app.get("/sitemap.xml")

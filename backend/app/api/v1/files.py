@@ -20,6 +20,8 @@ from app.utils.permissions import require_permission
 from app.utils.timezone import get_now
 from app.core.config import settings
 from app.services.supabase_storage import supabase_storage, get_cache_policy
+# 🟢 强行引入你写好的 R2 上传功能
+from app.services.r2_storage import upload_file_to_r2
 from app.services.log_service import LogService
 from io import BytesIO
 
@@ -279,13 +281,19 @@ async def upload_file(
         else:
             raise HTTPException(status_code=500, detail="文件上传到 Supabase 失败")
     else:
-        file_path = os.path.join(UPLOAD_DIR, folder, unique_filename)
-        dir_path = os.path.dirname(file_path)
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
-        async with aiofiles.open(file_path, 'wb') as f:
-            await f.write(content)
-        file_path = f"/uploads/{folder}/{unique_filename}"
+        # 🚀 强制改走 Cloudflare R2 大通道！
+        try:
+            public_url = await upload_file_to_r2(
+                file_data=content,        # 传入读取到的二进制内容
+                file_name=storage_key,    # 保持原有的路径结构 (如 images/xxx.png)
+                content_type=mime_type    # 传入文件类型
+            )
+            if public_url:
+                file_path = public_url    # R2 会完美返回你在 config.py 拼好的自定义域名绝对网址
+            else:
+                raise HTTPException(status_code=500, detail="上传到 Cloudflare R2 失败，请检查密钥和 Endpoint 网址")
+        except Exception as r2_err:
+            raise HTTPException(status_code=500, detail=f"R2存储器发生错误: {str(r2_err)}")
     
     db_file = ArticleFile(
         filename=unique_filename,
@@ -353,10 +361,19 @@ async def upload_image(
         else:
             raise HTTPException(status_code=500, detail="文件上传到 Supabase 失败")
     else:
-        file_path = os.path.join(UPLOAD_DIR, "images", unique_filename)
-        async with aiofiles.open(file_path, 'wb') as f:
-            await f.write(content)
-        file_path = f"/uploads/images/{unique_filename}"
+        # 🚀 图片专线同样强制改走 Cloudflare R2 大通道！
+        try:
+            public_url = await upload_file_to_r2(
+                file_data=content,
+                file_name=storage_key,
+                content_type=mime_type
+            )
+            if public_url:
+                file_path = public_url
+            else:
+                raise HTTPException(status_code=500, detail="上传图片到 Cloudflare R2 失败")
+        except Exception as r2_err:
+            raise HTTPException(status_code=500, detail=f"R2图片存储发生错误: {str(r2_err)}")
     
     db_file = ArticleFile(
         filename=unique_filename,
@@ -638,6 +655,7 @@ async def get_storage_info(
     
     if supabase_storage.is_enabled():
         result["upload_dir"] = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.SUPABASE_BUCKET}"
+        result["storage_type"] = "supabase"
         
         dir_stats = {}
         for f in db_files:
@@ -677,7 +695,48 @@ async def get_storage_info(
                 "files": stats["files"][:20],
                 "is_protected": folder in {"avatars", "logos", "images"}
             }
+    # 🚀 注意这里：既然走 R2 也是基于数据库统计，我们用 elif 来判定它！
+    elif settings.S3_PUBLIC_URL:
+        result["upload_dir"] = settings.S3_PUBLIC_URL 
+        result["storage_type"] = "cloudflare_r2"
+        
+        # 2. R2 模式下，跟上面一样，直接通过数据库统计文件大小并在后台好看地展现
+        dir_stats = {}
+        for f in db_files:
+            folder = "articles"
+            if "images/" in f.file_path: folder = "images"
+            elif "avatars/" in f.file_path: folder = "avatars"
+            elif "logos/" in f.file_path: folder = "logos"
+            elif "videos/" in f.file_path: folder = "videos"
+            elif "audio/" in f.file_path: folder = "audio"
+            
+            if folder not in dir_stats:
+                dir_stats[folder] = {"size": 0, "files": []}
+            
+            dir_stats[folder]["size"] += f.file_size or 0
+            dir_stats[folder]["files"].append({
+                "name": f.filename,
+                "display_name": f.original_filename,
+                "path": f.file_path,
+                "size": f.file_size or 0,
+                "size_formatted": format_file_size(f.file_size or 0),
+                "modified": f.created_at.isoformat() if f.created_at else "",
+                "is_avatar": folder == "avatars"
+            })
+            result["total_size"] += f.file_size or 0
+            result["total_files"] += 1
+        
+        for folder, stats in dir_stats.items():
+            result["directories"][folder] = {
+                "size": stats["size"],
+                "size_formatted": format_file_size(stats["size"]),
+                "file_count": len(stats["files"]),
+                "files": stats["files"][:20],
+                "is_protected": folder in {"avatars", "logos", "images"}
+            }
+
     else:
+        # 3. 只有当 Supabase 和 R2 都没开时，才真正退化到原作者的本地存储统计
         db_file_paths = set()
         db_file_map = {}
         for f in db_files:

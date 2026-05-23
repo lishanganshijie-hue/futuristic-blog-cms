@@ -14,6 +14,7 @@ from app.utils.auth import get_current_user
 from app.utils.permissions import require_permission
 from app.services.log_service import LogService
 from app.services.supabase_storage import supabase_storage
+from app.services.r2_storage import upload_file_to_r2, r2_client
 from app.core.config import settings
 from app.utils.cache import cache_manager
 import threading
@@ -86,6 +87,9 @@ def validate_logo_file(file: UploadFile) -> None:
         )
 
 
+from app.services.r2_storage import upload_file_to_r2, r2_client  # 🟢 引入我们改好的 R2 工具
+from app.core.config import settings
+
 async def save_logo_file(file: UploadFile) -> str:
     ensure_logo_directory()
     
@@ -97,7 +101,24 @@ async def save_logo_file(file: UploadFile) -> str:
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="文件大小不能超过2MB")
     
-    if supabase_storage.is_enabled():
+    # 🟢 核心修正 1：优先支持 Cloudflare R2 上传
+    if settings.S3_ENDPOINT_URL:
+        storage_key = f"logos/{filename}"
+        try:
+            public_url = await upload_file_to_r2(
+                file_data=content,
+                file_name=storage_key,
+                content_type=file.content_type
+            )
+            if public_url:
+                return public_url
+            else:
+                raise HTTPException(status_code=500, detail="Logo上传到 Cloudflare R2 失败")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"R2存储上传发生异常: {str(e)}")
+            
+    # 🟡 保持原有 Supabase 兼容
+    elif supabase_storage.is_enabled():
         storage_key = f"logos/{filename}"
         file_io = BytesIO(content)
         public_url = await supabase_storage.upload_file(file_io, storage_key, file.content_type)
@@ -105,6 +126,7 @@ async def save_logo_file(file: UploadFile) -> str:
             return public_url
         else:
             raise HTTPException(status_code=500, detail="Logo上传到 Supabase 失败")
+    # ❌ 降级兜底
     else:
         logo_path = get_logo_base_path()
         file_path = logo_path / filename
@@ -116,9 +138,24 @@ async def save_logo_file(file: UploadFile) -> str:
 
 
 def delete_logo_file(logo_url: str) -> bool:
-    if not logo_url or logo_url.startswith("http"):
+    if not logo_url:
         return True
     
+    # 🟢 核心修正 2：如果检测到是云端的 R2 链接，触发 R2 云端文件删除
+    if settings.S3_ENDPOINT_URL and settings.S3_PUBLIC_URL in logo_url:
+        try:
+            # 从公共 URL 提取出存储桶内的 Key（例如 logos/logo_123.jpg）
+            storage_key = logo_url.replace(settings.S3_PUBLIC_URL.rstrip('/'), "").lstrip('/')
+            r2_client.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=storage_key)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete logo from R2: {e}")
+            return False
+            
+    # 如果是本地历史遗留路径，保留原本的文件删除
+    if logo_url.startswith("http"):
+        return True
+        
     try:
         if logo_url.startswith("/uploads/logos/"):
             filename = logo_url[len("/uploads/logos/"):]
@@ -128,10 +165,9 @@ def delete_logo_file(logo_url: str) -> bool:
         logo_path = get_logo_base_path() / filename
         if logo_path.exists():
             logo_path.unlink()
-            return True
         return True
     except Exception as e:
-        logger.error(f"Failed to delete logo file: {e}")
+        logger.error(f"Failed to delete local logo file: {e}")
         return False
 
 

@@ -8,11 +8,10 @@ from app.schemas import ProfileResponse, ProfileUpdate
 from app.utils import get_current_user
 from app.utils.permissions import require_permission
 from app.services.log_service import LogService
-from app.utils.cache import cache_manager
+from app.utils.cache import cache
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 
-PROFILE_CACHE_NAME = "profile"
 PROFILE_CACHE_KEY = "profile:public"
 PROFILE_CACHE_TTL = 300
 
@@ -58,7 +57,7 @@ def get_or_create_profile(db: Session) -> Profile:
         db.add(profile)
         db.commit()
         db.refresh(profile)
-        cache_manager.delete(PROFILE_CACHE_NAME, PROFILE_CACHE_KEY)
+        cache.delete(PROFILE_CACHE_KEY)
     return profile
 
 
@@ -84,13 +83,13 @@ def profile_to_response(profile: Profile) -> dict:
 
 @router.get("", response_model=ProfileResponse)
 async def get_profile(db: Session = Depends(get_db)):
-    cached = cache_manager.get(PROFILE_CACHE_NAME, PROFILE_CACHE_KEY)
+    cached = cache.get(PROFILE_CACHE_KEY)
     if cached:
         return cached
     
     profile = get_or_create_profile(db)
     result = profile_to_response(profile)
-    cache_manager.set(PROFILE_CACHE_NAME, PROFILE_CACHE_KEY, result, PROFILE_CACHE_TTL)
+    cache.set(PROFILE_CACHE_KEY, result, PROFILE_CACHE_TTL)
     return result
 
 
@@ -118,7 +117,7 @@ async def update_profile(
         db.rollback()
         raise HTTPException(status_code=400, detail="数据保存失败，请检查输入内容")
     
-    cache_manager.delete(PROFILE_CACHE_NAME, PROFILE_CACHE_KEY)
+    cache.delete(PROFILE_CACHE_KEY)
     
     LogService.log_operation(
         db=db,

@@ -13,6 +13,8 @@ from app.utils.permissions import require_permission
 from app.services.log_service import LogService
 from app.services.avatar_service import AvatarFileService
 from app.services.supabase_storage import supabase_storage
+from app.services.r2_storage import upload_file_to_r2
+from app.core.config import settings
 from io import BytesIO
 
 router = APIRouter(prefix="/user-profile", tags=["UserProfile"])
@@ -99,7 +101,25 @@ async def save_avatar_file(file: UploadFile, user_id: int) -> str:
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="文件大小不能超过5MB")
     
-    if supabase_storage.is_enabled():
+    # 🟢 核心修正：优先检查 R2 存储配置
+    if settings.S3_ENDPOINT_URL:
+        storage_key = f"avatars/{filename}"
+        try:
+            # 调用强化的、带线程池的 R2 上传函数
+            public_url = await upload_file_to_r2(
+                file_data=content,
+                file_name=storage_key,
+                content_type=file.content_type
+            )
+            if public_url:
+                return public_url
+            else:
+                raise HTTPException(status_code=500, detail="头像上传到 Cloudflare R2 失败")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"R2存储上传发生异常: {str(e)}")
+            
+    # 🟡 次优选择：原有的 Supabase 逻辑保留兼容
+    elif supabase_storage.is_enabled():
         storage_key = f"avatars/{filename}"
         file_io = BytesIO(content)
         public_url = await supabase_storage.upload_file(file_io, storage_key, file.content_type)
@@ -107,6 +127,8 @@ async def save_avatar_file(file: UploadFile, user_id: int) -> str:
             return public_url
         else:
             raise HTTPException(status_code=500, detail="头像上传到 Supabase 失败")
+            
+    # ❌ 降级兜底：只有当云存储全部未配时才走本地（在 Render 上不推荐）
     else:
         avatar_path = AvatarFileService.get_avatar_base_path()
         file_path = avatar_path / filename

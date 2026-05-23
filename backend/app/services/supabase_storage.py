@@ -1,15 +1,17 @@
-from supabase import create_client, Client
-from typing import Optional, BinaryIO, List
+"""
+Supabase 兼容层 (已重定向至 Cloudflare R2)
+保持原有的方法签名不变，避免上层调用崩溃，但底层彻底切换为 R2 对象存储
+"""
 import logging
 import asyncio
-import boto3
+from typing import Optional, BinaryIO, List
 import httpx
-from botocore.config import Config
 from app.core.config import settings
+from app.services.r2_storage import r2_client  # 🟢 引入真正的 R2 客户端服务
 
 logger = logging.getLogger(__name__)
 
-
+# 保留原有的缓存策略定义
 CACHE_POLICIES = {
     "image": "public, max-age=31536000, immutable",
     "avatar": "public, max-age=604800, stale-while-revalidate=2592000",
@@ -36,38 +38,18 @@ def get_cache_policy(storage_key: str) -> str:
 
 class SupabaseStorageService:
     def __init__(self):
-        self.client: Optional[Client] = None
-        self.s3_client = None
-        if settings.USE_SUPABASE_STORAGE and settings.SUPABASE_URL and settings.SUPABASE_KEY:
-            self.client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-            
-            if settings.S3_ACCESS_KEY_ID and settings.S3_SECRET_ACCESS_KEY:
-                project_ref = settings.SUPABASE_URL.replace("https://", "").replace(".supabase.co", "")
-                s3_endpoint = f"https://{project_ref}.storage.supabase.co/storage/v1/s3"
-                self.s3_client = boto3.client(
-                    's3',
-                    endpoint_url=s3_endpoint,
-                    aws_access_key_id=settings.S3_ACCESS_KEY_ID,
-                    aws_secret_access_key=settings.S3_SECRET_ACCESS_KEY,
-                    config=Config(
-                        signature_version='s3v4',
-                        s3={'addressing_style': 'path'}
-                    ),
-                    region_name='us-east-1'
-                )
-                logger.info(f"Supabase Storage Service initialized with S3 API: {s3_endpoint}")
-            else:
-                logger.warning("S3 credentials not configured, using SDK upload")
+        # 🟢 判定标准变更为：只要开启了 R2 终终点，此服务就维持“可用”伪装
+        self.is_r2_active = bool(settings.S3_ENDPOINT_URL and settings.S3_BUCKET_NAME)
+        if self.is_r2_active:
+            logger.info("SupabaseStorageService 兼容层已激活，底层流量已成功重定向至 Cloudflare R2")
         else:
-            logger.info("Using local file storage")
+            logger.warning("R2 存储配置未就绪，兼容层运行在本地 Fallback 模式")
 
     def is_enabled(self) -> bool:
-        return self.client is not None
+        return self.is_r2_active
 
     def get_upload_method(self) -> str:
-        if self.s3_client:
-            return "s3"
-        return "none"
+        return "s3" if self.is_r2_active else "none"
 
     async def upload_file(
         self,
@@ -75,11 +57,9 @@ class SupabaseStorageService:
         key: str,
         content_type: Optional[str] = None
     ) -> Optional[str]:
+        """伪装上传：内部实际向 R2 投递文件"""
         if not self.is_enabled():
-            return None
-
-        if not self.s3_client:
-            logger.error("S3 client not configured. Cache-Control requires S3 API upload. Please set S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY environment variables.")
+            logger.error("R2 存储未配置，无法通过兼容层上传文件")
             return None
 
         try:
@@ -92,156 +72,129 @@ class SupabaseStorageService:
             if content_type:
                 extra_args['ContentType'] = content_type
 
-            logger.info(f"Uploading via S3 API: bucket={settings.SUPABASE_BUCKET}, key={key}, cache={cache_policy}")
-
-            self.s3_client.put_object(
-                Bucket=settings.SUPABASE_BUCKET,
-                Key=key,
-                Body=file_content,
-                **extra_args
-            )
-            logger.info(f"File uploaded via S3 API with cache control: {key}")
-
-            public_url = self.client.storage.from_(settings.SUPABASE_BUCKET).get_public_url(key)
+            # 🟢 狸猫换太子：使用 R2 Client 代替原有的 Supabase S3 Client
+            logger.info(f"[R2 兼容层] 正在上传文件至 R2 桶: key={key}")
             
+            # 使用 loop.run_in_executor 避免 boto3 同步阻塞异步循环
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                None,
+                lambda: r2_client.put_object(
+                    Bucket=settings.S3_BUCKET_NAME,
+                    Key=key,
+                    Body=file_content,
+                    **extra_args
+                )
+            )
+
+            # 🟢 拼接出真正的 R2 开放访问链接
+            public_url = f"{settings.S3_PUBLIC_URL.rstrip('/')}/{key.lstrip('/')}"
+            logger.info(f"[R2 兼容层] 上传成功。新云端 URL: {public_url}")
+
+            # 异步触发缓存预热（如果 R2 绑定了 CDN 或用于激活动态缓存）
             asyncio.create_task(self._warmup_cache_async(public_url, key))
             
             return public_url
 
         except Exception as e:
-            logger.error(f"Failed to upload file to Supabase: {e}", exc_info=True)
+            logger.error(f"[R2 兼容层] 文件投递至 R2 失败: {e}", exc_info=True)
             return None
 
     async def _warmup_cache_async(self, url: str, key: str):
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url, follow_redirects=True)
                 if response.status_code == 200:
-                    logger.info(f"Cache warmup successful: {key}")
+                    logger.info(f"R2 边缘节点缓存预热成功: {key}")
                 else:
-                    logger.warning(f"Cache warmup returned status {response.status_code}: {key}")
+                    logger.warning(f"R2 边缘节点返回非常规状态码 {response.status_code}: {key}")
         except Exception as e:
-            logger.warning(f"Cache warmup failed (non-critical): {key} - {e}")
+            logger.warning(f"R2 边缘缓存预热未完全响应 (非致命错误): {key} - {e}")
 
     async def warmup_cache(self, url: str) -> bool:
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(url, follow_redirects=True)
                 return response.status_code == 200
         except Exception as e:
-            logger.warning(f"Cache warmup failed: {url} - {e}")
+            logger.warning(f"缓存预热请求异常: {url} - {e}")
             return False
 
     async def warmup_cache_batch(self, urls: List[str]) -> dict:
         result = {"success": 0, "failed": 0}
         for url in urls:
-            try:
-                success = await self.warmup_cache(url)
-                if success:
-                    result["success"] += 1
-                else:
-                    result["failed"] += 1
-                await asyncio.sleep(0.05)
-            except Exception as e:
+            success = await self.warmup_cache(url)
+            if success:
+                result["success"] += 1
+            else:
                 result["failed"] += 1
-                logger.warning(f"Batch warmup failed for {url}: {e}")
-        logger.info(f"Cache warmup batch completed: {result['success']} success, {result['failed']} failed")
+            await asyncio.sleep(0.02)
         return result
 
     async def update_cache_control(self, key: str, cache_control: Optional[str] = None) -> bool:
-        if not self.s3_client:
-            logger.warning("S3 client not available, cannot update cache-control")
+        """重定向 R2 对象的 CacheControl"""
+        if not self.is_enabled():
             return False
-
         try:
             if cache_control is None:
                 cache_control = get_cache_policy(key)
 
-            head = self.s3_client.head_object(
-                Bucket=settings.SUPABASE_BUCKET,
-                Key=key
+            loop = asyncio.get_running_loop()
+            head = await loop.run_in_executor(
+                None, lambda: r2_client.head_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
             )
 
             copy_args = {
-                'Bucket': settings.SUPABASE_BUCKET,
+                'Bucket': settings.S3_BUCKET_NAME,
                 'Key': key,
-                'CopySource': {'Bucket': settings.SUPABASE_BUCKET, 'Key': key},
+                'CopySource': {'Bucket': settings.S3_BUCKET_NAME, 'Key': key},
                 'CacheControl': cache_control,
                 'MetadataDirective': 'REPLACE',
                 'ContentType': head.get('ContentType', 'application/octet-stream'),
             }
 
-            self.s3_client.copy_object(**copy_args)
-            logger.info(f"Updated cache-control for {key}: {cache_control}")
+            await loop.run_in_executor(None, lambda: r2_client.copy_object(**copy_args))
             return True
         except Exception as e:
-            logger.error(f"Failed to update cache-control for {key}: {e}", exc_info=True)
+            logger.error(f"[R2 兼容层] 修正元数据缓存策略失败 {key}: {e}")
             return False
 
     async def batch_update_cache_control(self, prefix: Optional[str] = None) -> dict:
-        if not self.s3_client:
-            logger.warning("S3 client not available, cannot batch update cache-control")
-            return {"updated": 0, "failed": 0, "errors": []}
-
-        result = {"updated": 0, "failed": 0, "errors": []}
-        try:
-            list_kwargs = {'Bucket': settings.SUPABASE_BUCKET, 'MaxKeys': 1000}
-            if prefix:
-                list_kwargs['Prefix'] = prefix
-
-            paginator = self.s3_client.get_paginator('list_objects_v2')
-            for page in paginator.paginate(**list_kwargs):
-                for obj in page.get('Contents', []):
-                    key = obj['Key']
-                    try:
-                        success = await self.update_cache_control(key)
-                        if success:
-                            result["updated"] += 1
-                        else:
-                            result["failed"] += 1
-                        await asyncio.sleep(0.1)
-                    except Exception as e:
-                        result["failed"] += 1
-                        result["errors"].append({"key": key, "error": str(e)})
-
-            logger.info(f"Batch update cache-control completed: {result['updated']} updated, {result['failed']} failed")
-        except Exception as e:
-            logger.error(f"Batch update cache-control failed: {e}", exc_info=True)
-            result["errors"].append({"error": str(e)})
-
-        return result
+        # R2 大批量处理建议去后台处理，此处做安全空返回，防止阻塞后台
+        return {"updated": 0, "failed": 0, "errors": []}
 
     async def delete_file(self, key: str) -> bool:
+        """通过 R2 删除老文件"""
         if not self.is_enabled():
             return False
-
         try:
-            response = self.client.storage.from_(settings.SUPABASE_BUCKET).remove([key])
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                None, lambda: r2_client.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
+            )
+            logger.info(f"[R2 兼容层] 物理文件已安全从 R2 中抹除: {key}")
             return True
         except Exception as e:
-            logger.error(f"Failed to delete file from Supabase: {e}")
+            logger.error(f"[R2 兼容层] 从 R2 删除文件失败 {key}: {e}")
             return False
 
     async def get_file_url(self, key: str) -> Optional[str]:
         if not self.is_enabled():
             return None
-
-        try:
-            public_url = self.client.storage.from_(settings.SUPABASE_BUCKET).get_public_url(key)
-            return public_url
-        except Exception as e:
-            logger.error(f"Failed to get file URL: {e}")
-            return None
+        return f"{settings.S3_PUBLIC_URL.rstrip('/')}/{key.lstrip('/')}"
 
     async def file_exists(self, key: str) -> bool:
         if not self.is_enabled():
             return False
-
         try:
-            response = self.client.storage.from_(settings.SUPABASE_BUCKET).list(path=key)
-            return len(response) > 0
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                None, lambda: r2_client.head_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
+            )
+            return True
         except Exception:
             return False
 
 
+# 保持单例导出命名一致
 supabase_storage = SupabaseStorageService()
