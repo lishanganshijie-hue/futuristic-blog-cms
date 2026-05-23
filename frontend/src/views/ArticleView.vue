@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from '@/utils/hljs'
 import DOMPurify from 'dompurify'
-import mermaid from 'mermaid'
+import { initMermaid, renderMermaidDiagrams, rerenderMermaidOnThemeChange } from '@/utils/mermaid'
 import { useRoute, useRouter } from 'vue-router'
 import { articleApi, likeApi, bookmarkApi, fileApi } from '@/api'
 import { useAuthStore, useUserInteractionStore, useThemeStore } from '@/stores'
@@ -592,57 +592,16 @@ const loadArticle = async (slug: string) => {
   } finally {
     loading.value = false
     nextTick(async () => {
-      const mermaidElements = document.querySelectorAll('.mermaid')
-      for (let i = 0; i < mermaidElements.length; i++) {
-        const el = mermaidElements[i] as HTMLElement
-        const id = `mermaid-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`
-        try {
-          const { svg } = await mermaid.render(id, el.textContent || '')
-          el.innerHTML = svg
-        } catch {}
+      const articleContent = document.querySelector('.article-content')
+      if (articleContent) {
+        await renderMermaidDiagrams(articleContent as HTMLElement, '.mermaid', themeStore.isDark)
       }
     })
   }
 }
 
 onMounted(async () => {
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: themeStore.isDark ? 'dark' : 'default',
-    securityLevel: 'loose',
-    flowchart: {
-      useMaxWidth: false,
-      htmlLabels: true,
-      curve: 'basis',
-      padding: 15
-    },
-    sequence: {
-      useMaxWidth: false,
-      actorMargin: 50,
-      boxMargin: 10,
-      boxTextMargin: 5,
-      noteMargin: 10,
-      messageMargin: 35,
-      mirrorActors: true,
-      bottomMarginAdj: 1
-    },
-    gantt: {
-      useMaxWidth: false,
-      leftPadding: 75,
-      gridLineStartPadding: 35,
-      barHeight: 20,
-      barGap: 4,
-      topPadding: 50,
-      fontSize: 14,
-      sectionFontSize: 14,
-      numberSectionStyles: 4,
-      axisFormat: '%Y-%m-%d'
-    },
-    themeVariables: {
-      fontSize: '20px',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }
-  })
+  await initMermaid(themeStore.isDark)
   
   document.addEventListener('click', handleCopyCode)
   document.addEventListener('click', handleFileLinkClick)
@@ -707,79 +666,10 @@ watch(() => route.params.slug, async (newSlug, oldSlug) => {
   }
 })
 
-watch(() => themeStore.isDark, (isDark) => {
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: isDark ? 'dark' : 'default',
-    securityLevel: 'loose',
-    flowchart: {
-      useMaxWidth: false,
-      htmlLabels: true,
-      curve: 'basis',
-      padding: 15
-    },
-    sequence: {
-      useMaxWidth: false,
-      actorMargin: 50,
-      boxMargin: 10,
-      boxTextMargin: 5,
-      noteMargin: 10,
-      messageMargin: 35,
-      mirrorActors: true,
-      bottomMarginAdj: 1
-    },
-    gantt: {
-      useMaxWidth: false,
-      leftPadding: 75,
-      gridLineStartPadding: 35,
-      barHeight: 20,
-      barGap: 4,
-      topPadding: 50,
-      fontSize: 14,
-      sectionFontSize: 14,
-      numberSectionStyles: 4,
-      axisFormat: '%Y-%m-%d'
-    },
-    themeVariables: {
-      fontSize: '20px',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }
-  })
-  
-  const mermaidElements = document.querySelectorAll('.article-content .mermaid')
-  if (mermaidElements.length > 0) {
-    mermaidElements.forEach((el) => {
-      const pre = el as HTMLElement
-      const oldSvg = pre.querySelector('svg')
-      const encodedCode = pre.getAttribute('data-mermaid-code')
-      
-      if (oldSvg && encodedCode) {
-        oldSvg.style.opacity = '0.6'
-        
-        const tempDiv = document.createElement('div')
-        tempDiv.style.position = 'absolute'
-        tempDiv.style.visibility = 'hidden'
-        tempDiv.style.pointerEvents = 'none'
-        document.body.appendChild(tempDiv)
-        
-        const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        
-        mermaid.render(id, decodeURIComponent(encodedCode)).then(({ svg }) => {
-          pre.innerHTML = svg
-          const finalSvg = pre.querySelector('svg')
-          if (finalSvg) {
-            finalSvg.style.opacity = '0'
-            requestAnimationFrame(() => {
-              if (finalSvg) {
-                finalSvg.style.transition = 'opacity 0.15s ease'
-                finalSvg.style.opacity = '1'
-              }
-            })
-          }
-          document.body.removeChild(tempDiv)
-        })
-      }
-    })
+watch(() => themeStore.isDark, async (isDark) => {
+  const articleContent = document.querySelector('.article-content')
+  if (articleContent) {
+    await rerenderMermaidOnThemeChange(articleContent as HTMLElement, '.mermaid', isDark)
   }
 })
 
@@ -1954,20 +1844,20 @@ watch(article, async (newVal) => {
 }
 
 .article-content :deep(.mermaid-wrapper) {
-  @apply flex justify-center;
-  overflow-x: auto;
+  width: 100%;
   margin-bottom: 1rem;
 }
 
 .article-content :deep(.mermaid) {
-  @apply flex justify-center bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
+  @apply bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
 }
 
 .article-content :deep(.mermaid svg) {
-  width: 100%;
   height: auto;
+  min-width: max-content;
+  zoom: 0.5;
 }
 
 .mobile-toc-drawer {

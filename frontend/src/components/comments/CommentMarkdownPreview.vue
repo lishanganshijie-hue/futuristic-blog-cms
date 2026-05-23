@@ -3,7 +3,7 @@ import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from '@/utils/hljs'
 import DOMPurify from 'dompurify'
-import mermaid from 'mermaid'
+import { initMermaid, renderMermaidDiagrams, rerenderMermaidOnThemeChange } from '@/utils/mermaid'
 import { useThemeStore } from '@/stores'
 
 const props = withDefaults(defineProps<{
@@ -22,12 +22,12 @@ const createRenderer = () => {
   renderer.code = (code: string, infostring: string | undefined, _escaped: boolean) => {
     if (infostring === 'mermaid') {
       const encodedCode = encodeURIComponent(code)
-      const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`
+      const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`
       const langIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>`
       return `<div class="code-block-wrapper relative group mermaid-wrapper" data-mermaid="${encodedCode}">
-        <div class="absolute top-4 left-3 right-1 flex justify-between items-center z-20">
+        <div class="absolute top-2 left-4 right-2 flex justify-between items-center z-20">
           <span class="text-sm text-gray-500 dark:text-gray-400">${langIcon}mermaid</span>
-          <button class="copy-code-btn flex items-center justify-center w-7 h-7 rounded text-gray-500 hover:text-primary transition-colors" data-code="${encodedCode}">${copyIcon}</button>
+          <button class="copy-code-btn flex items-center justify-center w-8 h-8 rounded text-gray-500 hover:text-primary transition-colors" data-code="${encodedCode}">${copyIcon}</button>
         </div>
         <pre class="mermaid" data-mermaid-code="${encodedCode}">${code}</pre>
       </div>`
@@ -171,7 +171,7 @@ const renderedContent = computed(() => {
   const rawHtml = marked.parse(props.content, { renderer, gfm: true, breaks: true, async: false }) as string
   
   const html = DOMPurify.sanitize(rawHtml, {
-    ADD_ATTR: ['target', 'rel', 'loading', 'class', 'data-mermaid-code'],
+    ADD_ATTR: ['target', 'rel', 'loading', 'class', 'data-mermaid', 'data-mermaid-code'],
     ADD_TAGS: ['iframe'],
   })
   
@@ -199,75 +199,27 @@ const handleCopyCode = (e: MouseEvent) => {
   }
 }
 
-onMounted(() => {
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: themeStore.isDark ? 'dark' : 'default',
-    securityLevel: 'loose',
-    flowchart: {
-      useMaxWidth: false,
-      htmlLabels: true,
-      curve: 'basis',
-      padding: 15
-    },
-    sequence: {
-      useMaxWidth: false,
-      actorMargin: 50,
-      boxMargin: 10,
-      boxTextMargin: 5,
-      noteMargin: 10,
-      messageMargin: 35,
-      mirrorActors: true,
-      bottomMarginAdj: 1
-    },
-    themeVariables: {
-      fontSize: '20px',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }
-  })
+onMounted(async () => {
+  await initMermaid(themeStore.isDark)
   
   if (previewRef.value) {
     previewRef.value.addEventListener('click', handleCopyCode)
   }
-})
-
-const renderMermaid = async () => {
-  if (!previewRef.value) return
   
-  const mermaidElements = previewRef.value.querySelectorAll('.mermaid')
-  if (mermaidElements.length === 0) return
-  
-  const unrendered = Array.from(mermaidElements).filter(el => !el.hasAttribute('data-rendered'))
-  if (unrendered.length === 0) return
-  
-  for (let i = 0; i < unrendered.length; i++) {
-    const el = unrendered[i] as HTMLElement
-    el.setAttribute('data-rendered', 'true')
-    
-    const id = `mermaid-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`
-    
-    try {
-      const { svg } = await mermaid.render(id, el.textContent || '')
-      el.innerHTML = svg
-    } catch {
-      el.removeAttribute('data-rendered')
-    }
-  }
-}
-
-watch(() => props.content, () => {
-  nextTick(() => {
-    renderMermaid()
-  })
-})
-
-onMounted(() => {
   nextTick(() => {
     if (previewRef.value) {
       const rect = previewRef.value.getBoundingClientRect()
       if (rect.width > 0 && rect.height > 0) {
-        renderMermaid()
+        renderMermaidDiagrams(previewRef.value, '.mermaid', themeStore.isDark)
       }
+    }
+  })
+})
+
+watch(() => props.content, () => {
+  nextTick(() => {
+    if (previewRef.value) {
+      renderMermaidDiagrams(previewRef.value, '.mermaid', themeStore.isDark)
     }
   })
 })
@@ -278,74 +230,9 @@ onUnmounted(() => {
   }
 })
 
-watch(() => themeStore.isDark, (isDark) => {
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: isDark ? 'dark' : 'default',
-    securityLevel: 'loose',
-    flowchart: {
-      useMaxWidth: false,
-      htmlLabels: true,
-      curve: 'basis',
-      padding: 15
-    },
-    sequence: {
-      useMaxWidth: false,
-      actorMargin: 50,
-      boxMargin: 10,
-      boxTextMargin: 5,
-      noteMargin: 10,
-      messageMargin: 35,
-      mirrorActors: true,
-      bottomMarginAdj: 1
-    },
-    themeVariables: {
-      fontSize: '20px',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }
-  })
-  
+watch(() => themeStore.isDark, async (isDark) => {
   if (previewRef.value) {
-    const mermaidElements = previewRef.value.querySelectorAll('.mermaid')
-    if (mermaidElements.length > 0) {
-      mermaidElements.forEach((el) => {
-        const pre = el as HTMLElement
-        const oldSvg = pre.querySelector('svg')
-        const encodedCode = pre.getAttribute('data-mermaid-code')
-        
-        if (oldSvg && encodedCode) {
-          oldSvg.style.opacity = '0.6'
-          
-          const tempDiv = document.createElement('div')
-          tempDiv.style.position = 'absolute'
-          tempDiv.style.visibility = 'hidden'
-          tempDiv.style.pointerEvents = 'none'
-          tempDiv.innerHTML = `<pre class="mermaid">${decodeURIComponent(encodedCode)}</pre>`
-          document.body.appendChild(tempDiv)
-          
-          const tempPre = tempDiv.querySelector('.mermaid') as HTMLElement
-          
-          mermaid.run({ nodes: [tempPre] }).then(() => {
-            const newSvg = tempPre.querySelector('svg')
-               if (newSvg) {
-                 pre.innerHTML = ''
-                 pre.appendChild(newSvg.cloneNode(true))
-              const finalSvg = pre.querySelector('svg')
-              if (finalSvg) {
-                finalSvg.style.opacity = '0'
-                requestAnimationFrame(() => {
-                  if (finalSvg) {
-                    finalSvg.style.transition = 'opacity 0.15s ease'
-                    finalSvg.style.opacity = '1'
-                  }
-                })
-              }
-            }
-            document.body.removeChild(tempDiv)
-          })
-        }
-      })
-    }
+    await rerenderMermaidOnThemeChange(previewRef.value, '.mermaid', isDark)
   }
 })
 </script>
@@ -360,8 +247,8 @@ watch(() => themeStore.isDark, (isDark) => {
 
 <style scoped>
 .comment-markdown-preview :deep(pre) {
-  @apply bg-gray-100 dark:bg-dark-300;
-  border-radius: 0.375rem;
+  @apply bg-gray-50 dark:bg-dark-300;
+  border-radius: 0.75rem;
   padding: 0.75rem;
   overflow-x: auto;
   overflow-y: hidden;
@@ -381,27 +268,21 @@ watch(() => themeStore.isDark, (isDark) => {
 }
 
 .comment-markdown-preview :deep(.code-block-wrapper pre) {
-  @apply bg-gray-100 dark:bg-dark-300;
-  border-radius: 0.375rem;
-  padding: 0.75rem;
-  padding-top: 2.5rem;
-  overflow-x: auto;
-  overflow-y: clip;
-  margin-bottom: 0.5rem;
+  @apply bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  padding: 0.75rem;
+  padding-top: 2.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .comment-markdown-preview :deep(.code-block-wrapper pre.mermaid) {
-  @apply bg-gray-100 dark:bg-dark-300;
-  border-radius: 0.375rem;
-  padding: 0.75rem;
-  padding-top: 2.5rem;
-  overflow-x: auto;
-  overflow-y: clip;
-  margin-bottom: 0.5rem;
+  @apply bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  padding: 0.75rem;
+  padding-top: 2.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .comment-markdown-preview :deep(.hljs) {
@@ -440,21 +321,19 @@ watch(() => themeStore.isDark, (isDark) => {
 }
 
 .comment-markdown-preview :deep(.mermaid-wrapper) {
-  display: flex;
-  justify-content: center;
+  width: 100%;
   margin-bottom: 0.5rem;
-  overflow-x: auto;
 }
 
 .comment-markdown-preview :deep(.mermaid) {
-  @apply flex justify-center bg-gray-100 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/10;
+  @apply bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
-  position: relative;
 }
 
 .comment-markdown-preview :deep(.mermaid svg) {
-  width: 100%;
   height: auto;
+  min-width: max-content;
+  zoom: 0.5;
 }
 </style>

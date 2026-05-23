@@ -223,8 +223,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, inject, watch, nextTick, type Ref } from 'vue'
-import mermaid from 'mermaid'
+import { initMermaid, renderMermaidDiagrams } from '@/utils/mermaid'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores'
 import type { Comment } from '@/types'
 import CommentMarkdownPreview from './CommentMarkdownPreview.vue'
 import CommentEditor from './CommentEditor.vue'
@@ -244,6 +245,7 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const themeStore = useThemeStore()
 const showReplyForm = ref(false)
 const replyContent = ref('')
 const submittingReply = ref(false)
@@ -274,19 +276,10 @@ watch(showReplies, (newVal) => {
   
   if (newVal) {
     nextTick(async () => {
-      const mermaidElements = document.querySelectorAll('.comment-item .mermaid:not([data-rendered])')
-      for (let i = 0; i < mermaidElements.length; i++) {
-        const el = mermaidElements[i] as HTMLElement
-        el.setAttribute('data-rendered', 'true')
-        
-        const id = `mermaid-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`
-        
-        try {
-          const { svg } = await mermaid.render(id, el.textContent || '')
-          el.innerHTML = svg
-        } catch {
-          el.removeAttribute('data-rendered')
-        }
+      const commentItem = document.querySelector('.comment-item')
+      if (commentItem) {
+        await initMermaid(themeStore.isDark)
+        await renderMermaidDiagrams(commentItem as HTMLElement, '.mermaid:not([data-rendered])', themeStore.isDark)
       }
     })
   }
