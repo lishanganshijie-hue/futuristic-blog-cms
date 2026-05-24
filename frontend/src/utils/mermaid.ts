@@ -11,10 +11,7 @@ const getMermaidConfig = (isDark: boolean): MermaidConfig => ({
   flowchart: {
     useMaxWidth: false,
     htmlLabels: true,
-    curve: 'basis',
-    padding: 25,
-    nodeSpacing: 60,
-    rankSpacing: 60
+    curve: 'basis'
   },
   sequence: {
     useMaxWidth: false,
