@@ -26,7 +26,7 @@ const formatCount = (count: number) => {
   return count.toString()
 }
 
-// 完美保留：原汁原味的后台图片路径解析
+// 原汁原味的后台图片路径解析
 const getLogoUrl = (url: string) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
@@ -34,7 +34,7 @@ const getLogoUrl = (url: string) => {
   return `/${url}`
 }
 
-// 借鉴高分博客：防爬虫动态邮件唤起
+// 防爬虫动态邮件唤起
 const handleEmailClick = (e: MouseEvent, rawUrl: string) => {
   if (!rawUrl.startsWith('mailto:')) return
   e.preventDefault()
@@ -119,7 +119,6 @@ onMounted(() => {
             :href="link.icon === 'email' ? '#' : link.url"
             :target="link.icon === 'email' ? undefined : '_blank'"
             :rel="link.icon === 'email' ? undefined : 'noopener noreferrer'"
-            /* 🌟 复刻原代码 btn-regular：自带微动效和高灵敏度 active 按压反馈 */
             class="w-10 h-10 rounded-xl bg-gray-50 hover:bg-primary/10 dark:bg-white/[0.03] dark:hover:bg-primary/20 flex items-center justify-center text-gray-500 dark:text-neutral-400 hover:text-primary dark:hover:text-primary border border-gray-100 dark:border-white/[0.05] hover:border-primary/20 active:scale-90 transition-all duration-200 relative"
             @click="link.icon === 'email' && handleEmailClick($event, link.url)"
             @mouseenter="showTooltip(link.id)"
@@ -169,7 +168,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 精美悬浮气泡 */
 .action-tooltip {
   position: absolute;
   bottom: calc(100% + 10px);
@@ -185,7 +183,7 @@ onMounted(() => {
   pointer-events: none;
   z-index: 50;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  border: 1px border #f3f4f6;
+  border: 1px solid #f3f4f6;
   animation: tooltip-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
