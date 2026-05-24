@@ -1857,7 +1857,13 @@ watch(article, async (newVal) => {
 .article-content :deep(.mermaid svg) {
   height: auto;
   min-width: max-content;
-  zoom: 0.5;
+  zoom: 0.3;
+}
+
+@media (min-width: 768px) {
+  .article-content :deep(.mermaid svg) {
+    zoom: 0.4;
+  }
 }
 
 .mobile-toc-drawer {
