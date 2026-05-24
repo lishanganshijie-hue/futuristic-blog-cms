@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from '@/utils/hljs'
 import DOMPurify from 'dompurify'
-import mermaid from 'mermaid'
+import { initMermaid, renderMermaidDiagrams, rerenderMermaidOnThemeChange, debounce } from '@/utils/mermaid'
 import { useThemeStore } from '@/stores'
 
 const props = defineProps<{
@@ -27,7 +27,7 @@ renderer.code = (code: string, infostring: string | undefined, _escaped: boolean
     const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`
     const langIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>`
     return `<div class="code-block-wrapper relative group mermaid-wrapper" data-mermaid="${encodedCode}">
-      <div class="absolute top-6 left-4 right-2 flex justify-between items-center z-20">
+      <div class="absolute top-2 left-4 right-2 flex justify-between items-center z-20">
         <span class="text-sm text-gray-500 dark:text-gray-400">${langIcon}mermaid</span>
         <button class="copy-code-btn flex items-center justify-center w-8 h-8 rounded text-gray-500 hover:text-primary transition-colors" data-code="${encodedCode}">${copyIcon}</button>
       </div>
@@ -147,21 +147,18 @@ const renderMarkdown = () => {
   }
   
   nextTick(async () => {
-      isRendering.value = false
-      const mermaidElements = document.querySelectorAll('.preview-content .mermaid')
-      for (let i = 0; i < mermaidElements.length; i++) {
-        const el = mermaidElements[i] as HTMLElement
-        const id = `mermaid-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`
-        try {
-          const { svg } = await mermaid.render(id, el.textContent || '')
-          el.innerHTML = svg
-        } catch {}
-      }
-    })
+    isRendering.value = false
+    const previewContent = document.querySelector('.preview-content')
+    if (previewContent) {
+      await renderMermaidDiagrams(previewContent as HTMLElement, '.mermaid', themeStore.isDark)
+    }
+  })
 }
 
+const debouncedRender = debounce(renderMarkdown, 300)
+
 watch(() => props.content, () => {
-  renderMarkdown()
+  debouncedRender()
 }, { immediate: true })
 
 const handleScroll = (e: Event) => {
@@ -196,99 +193,18 @@ const handleCopyCode = (e: MouseEvent) => {
   }
 }
 
-onMounted(() => {
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: themeStore.isDark ? 'dark' : 'default',
-    securityLevel: 'loose',
-    flowchart: {
-      useMaxWidth: false,
-      htmlLabels: true,
-      curve: 'basis',
-      padding: 15
-    },
-    sequence: {
-      useMaxWidth: false,
-      actorMargin: 50,
-      boxMargin: 10,
-      boxTextMargin: 5,
-      noteMargin: 10,
-      messageMargin: 35,
-      mirrorActors: true,
-      bottomMarginAdj: 1
-    },
-    themeVariables: {
-      fontSize: '20px',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }
-  })
+onMounted(async () => {
+  await initMermaid(themeStore.isDark)
   
   if (previewRef.value) {
     previewRef.value.addEventListener('click', handleCopyCode)
   }
 })
 
-watch(() => themeStore.isDark, (isDark) => {
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: isDark ? 'dark' : 'default',
-    securityLevel: 'loose',
-    flowchart: {
-      useMaxWidth: false,
-      htmlLabels: true,
-      curve: 'basis',
-      padding: 15
-    },
-    sequence: {
-      useMaxWidth: false,
-      actorMargin: 50,
-      boxMargin: 10,
-      boxTextMargin: 5,
-      noteMargin: 10,
-      messageMargin: 35,
-      mirrorActors: true,
-      bottomMarginAdj: 1
-    },
-    themeVariables: {
-      fontSize: '20px',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }
-  })
-  
-  const mermaidElements = document.querySelectorAll('.preview-content .mermaid')
-  if (mermaidElements.length > 0) {
-    mermaidElements.forEach((el) => {
-      const pre = el as HTMLElement
-      const oldSvg = pre.querySelector('svg')
-      const encodedCode = pre.getAttribute('data-mermaid-code')
-      
-      if (oldSvg && encodedCode) {
-        oldSvg.style.opacity = '0.6'
-        
-        const tempDiv = document.createElement('div')
-        tempDiv.style.position = 'absolute'
-        tempDiv.style.visibility = 'hidden'
-        tempDiv.style.pointerEvents = 'none'
-        document.body.appendChild(tempDiv)
-        
-        const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        
-        mermaid.render(id, decodeURIComponent(encodedCode)).then(({ svg }) => {
-          pre.innerHTML = svg
-          const finalSvg = pre.querySelector('svg')
-          if (finalSvg) {
-            finalSvg.style.opacity = '0'
-            requestAnimationFrame(() => {
-              if (finalSvg) {
-                finalSvg.style.transition = 'opacity 0.15s ease'
-                finalSvg.style.opacity = '1'
-              }
-            })
-          }
-          document.body.removeChild(tempDiv)
-        })
-      }
-    })
+watch(() => themeStore.isDark, async (isDark) => {
+  const previewContent = document.querySelector('.preview-content')
+  if (previewContent) {
+    await rerenderMermaidOnThemeChange(previewContent as HTMLElement, '.mermaid', isDark)
   }
 })
 
@@ -416,8 +332,8 @@ defineExpose({
 }
 
 .preview-content :deep(pre) {
-  @apply bg-gray-100 dark:bg-dark-300;
-  border-radius: 0.5rem;
+  @apply bg-gray-50 dark:bg-dark-300;
+  border-radius: 0.75rem;
   padding: 1rem;
   overflow-x: auto;
   overflow-y: hidden;
@@ -437,27 +353,44 @@ defineExpose({
 }
 
 .preview-content :deep(.code-block-wrapper pre) {
-  @apply bg-gray-100 dark:bg-dark-300;
-  border-radius: 0.5rem;
+  @apply bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 1rem;
   padding-top: 2.5rem;
-  overflow-x: auto;
-  overflow-y: clip;
+  margin-bottom: 0.5rem;
+}
+
+.preview-content :deep(.code-block-wrapper pre.mermaid) {
+  @apply bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem;
+  padding-top: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.preview-content :deep(.mermaid-wrapper) {
+  width: 100%;
   margin-bottom: 1rem;
+}
+
+.preview-content :deep(.mermaid) {
+  @apply bg-gray-50 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/5;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
 }
 
-.preview-content :deep(.code-block-wrapper pre.mermaid) {
-  @apply bg-gray-100 dark:bg-dark-300;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  padding-top: 2.5rem;
-  overflow-x: auto;
-  overflow-y: clip;
-  margin-bottom: 1rem;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
+.preview-content :deep(.mermaid svg) {
+  height: auto;
+  min-width: max-content;
+  zoom: 0.3;
+}
+
+@media (min-width: 768px) {
+  .preview-content :deep(.mermaid svg) {
+    zoom: 0.4;
+  }
 }
 
 .preview-content :deep(.hljs) {
@@ -762,23 +695,5 @@ defineExpose({
     padding: 0.2rem 0.25rem;
     font-size: 11px;
   }
-}
-
-.preview-content :deep(.mermaid-wrapper) {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1rem;
-  overflow-x: auto;
-}
-
-.preview-content :deep(.mermaid) {
-  @apply flex justify-center bg-gray-100 dark:bg-dark-300 rounded-xl overflow-x-auto overflow-y-hidden border border-gray-200 dark:border-white/10;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-.preview-content :deep(.mermaid svg) {
-  width: 100%;
-  height: auto;
 }
 </style>
