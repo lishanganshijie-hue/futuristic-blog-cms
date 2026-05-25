@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useThemeStore, useAuthStore, useSiteConfigStore, useUserProfileStore, useDialogStore } from '@/stores'
 import UserAvatar from './UserAvatar.vue'
@@ -15,6 +15,7 @@ const dialog = useDialogStore()
 
 const isMenuOpen = ref(false)
 const isDesktopDropdownOpen = ref(false)
+const AvatarCropper = defineAsyncComponent(() => import('./AvatarCropper.vue'))
 
 const navLinks = computed(() => [
   { name: '首页', path: '/' },

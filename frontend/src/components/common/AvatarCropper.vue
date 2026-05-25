@@ -161,7 +161,7 @@
                     v-if="activeTooltip === 'rotateleft'"
                     class="action-tooltip"
                   >
-                    向左旋转
+                    向向左旋转
                   </span>
                 </button>
                 <button
@@ -395,7 +395,11 @@ const scaleState = ref({ x: 1, y: 1 })
 
 const activeTooltip = ref<string | null>(null)
 
+// ⏳ 防御型：本地挂载初始化防抖定时器，扼杀内存泄漏
+let initTimer: ReturnType<typeof setTimeout> | null = null
+
 const showTooltip = (name: string) => {
+  if (!cropperReady.value) return
   activeTooltip.value = name
 }
 
@@ -435,15 +439,8 @@ const loadImage = (): Promise<void> => {
 }
 
 const initCropper = async () => {
-  if (!imageRef.value) {
-    console.warn('Cropper init: image ref is null')
-    isLoading.value = false
-    loadError.value = true
-    return
-  }
-
-  if (!previewRef.value || !previewSmallRef.value) {
-    console.warn('Cropper init: preview refs are null')
+  if (!imageRef.value || !previewRef.value || !previewSmallRef.value) {
+    console.warn('Cropper init: refs are not ready')
     isLoading.value = false
     loadError.value = true
     return
@@ -459,7 +456,8 @@ const initCropper = async () => {
   try {
     await loadImage()
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    // 再次校准：异步加载期间如果用户已经关了 Modal，则直接叫停初始化
+    if (!props.modelValue) return
 
     cropperInstance.value = new Cropper(imageRef.value!, {
       aspectRatio: props.aspectRatio ?? 1,
@@ -486,44 +484,39 @@ const initCropper = async () => {
   }
 }
 
-const handleZoomIn = () => {
+// 🛠️ 统一动作控制流：防止按钮禁用后导致浏览器丢失 mouseleave 引发的 Tooltip 卡死现象
+const executeAction = (action: () => void) => {
   if (!cropperInstance.value || !cropperReady.value) return
-  cropperInstance.value.zoom(0.1)
+  action()
+  hideTooltip()
 }
 
-const handleZoomOut = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  cropperInstance.value.zoom(-0.1)
-}
-
-const handleRotateLeft = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  cropperInstance.value.rotate(-90)
-}
-
-const handleRotateRight = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  cropperInstance.value.rotate(90)
-}
+const handleZoomIn = () => executeAction(() => cropperInstance.value!.zoom(0.1))
+const handleZoomOut = () => executeAction(() => cropperInstance.value!.zoom(-0.1))
+const handleRotateLeft = () => executeAction(() => cropperInstance.value!.rotate(-90))
+const handleRotateRight = () => executeAction(() => cropperInstance.value!.rotate(90))
 
 const handleFlipHorizontal = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  const newX = scaleState.value.x === 1 ? -1 : 1
-  cropperInstance.value.scaleX(newX)
-  scaleState.value.x = newX
+  executeAction(() => {
+    const newX = scaleState.value.x === 1 ? -1 : 1
+    cropperInstance.value!.scaleX(newX)
+    scaleState.value.x = newX
+  })
 }
 
 const handleFlipVertical = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  const newY = scaleState.value.y === 1 ? -1 : 1
-  cropperInstance.value.scaleY(newY)
-  scaleState.value.y = newY
+  executeAction(() => {
+    const newY = scaleState.value.y === 1 ? -1 : 1
+    cropperInstance.value!.scaleY(newY)
+    scaleState.value.y = newY
+  })
 }
 
 const handleReset = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  cropperInstance.value.reset()
-  scaleState.value = { x: 1, y: 1 }
+  executeAction(() => {
+    cropperInstance.value!.reset()
+    scaleState.value = { x: 1, y: 1 }
+  })
 }
 
 const handleConfirm = async () => {
@@ -539,18 +532,13 @@ const handleConfirm = async () => {
       imageSmoothingQuality: 'high'
     })
 
-    if (!canvas) {
-      throw new Error('Failed to create canvas')
-    }
+    if (!canvas) throw new Error('Failed to create canvas')
 
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
         (blob: Blob | null) => {
-          if (blob) {
-            resolve(blob)
-          } else {
-            reject(new Error('Failed to create blob'))
-          }
+          if (blob) resolve(blob)
+          else reject(new Error('Failed to create blob'))
         },
         'image/jpeg',
         props.outputQuality || 0.9
@@ -572,12 +560,16 @@ const handleCancel = () => {
 }
 
 const destroyCropper = () => {
+  if (initTimer) {
+    clearTimeout(initTimer)
+    initTimer = null
+  }
   if (cropperInstance.value) {
     cropperInstance.value.destroy()
     cropperInstance.value = null
   }
   cropperReady.value = false
-  scaleState.value = { x: 1, y: 1 }
+  hideTooltip()
 }
 
 watch(() => props.modelValue, async (newValue) => {
@@ -588,13 +580,14 @@ watch(() => props.modelValue, async (newValue) => {
     
     await nextTick()
     
+    // 🚀 双向队列看守：确保外部环境在极短时间内连续切换弹窗时，上一次的延迟初始化会被无情掐断
     requestAnimationFrame(() => {
-      setTimeout(initCropper, 100)
+      if (!props.modelValue) return
+      if (initTimer) clearTimeout(initTimer)
+      initTimer = setTimeout(initCropper, 100)
     })
   } else {
     destroyCropper()
-    isLoading.value = true
-    loadError.value = false
   }
 })
 
@@ -615,7 +608,7 @@ onUnmounted(() => {
 .cropper-image {
   display: block;
   max-width: 100%;
-  opacity: 0;
+  /* 🪄 改动：移除了强制不透明度为0的操作，交由插件去安全操纵图层显隐 */
 }
 
 .cropper-btn {

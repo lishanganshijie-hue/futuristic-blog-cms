@@ -11,17 +11,31 @@ const searchQuery = ref('')
 const searchResults = ref<any[]>([])
 const isSearching = ref(false)
 
+// 针对防抖加一个本地定时器引用
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+// 安全转义文本，防止 XSS，并做高亮处理
 const highlightText = (text: string, keyword: string): string => {
-  if (!keyword || !text) return text
+  if (!keyword || !text) {
+    // 即使不匹配，也用原生 div 转义，保障基础安全
+    const div = document.createElement('div')
+    div.innerText = text
+    return div.innerHTML
+  }
   
   const escapeRegExp = (str: string) => {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
   
+  // 先把原始文本里的 HTML 标签转义成安全文本，防止 v-html 借刀杀人
+  const div = document.createElement('div')
+  div.innerText = text
+  const safeText = div.innerHTML
+
   const pattern = escapeRegExp(keyword)
   const regex = new RegExp(`(${pattern})`, 'gi')
   
-  return text.replace(regex, '<mark class="search-highlight">$1</mark>')
+  return safeText.replace(regex, '<mark class="search-highlight">$1</mark>')
 }
 
 const filteredResults = computed(() => {
@@ -44,6 +58,7 @@ const openSearch = () => {
 const closeSearch = () => {
   isOpen.value = false
   searchQuery.value = ''
+  if (debounceTimer) clearTimeout(debounceTimer) // 关闭时清空未发出的请求
 }
 
 const handleKeydown = (e: KeyboardEvent) => {
@@ -74,20 +89,29 @@ const goToArticle = (slug: string) => {
   }
 }
 
-const performSearch = async () => {
-  if (!searchQuery.value.trim()) return
-  
-  isSearching.value = true
-  try {
-    await blogStore.fetchArticles({ 
-      search: searchQuery.value,
-      page: 1,
-      page_size: 8
-    })
-    searchResults.value = blogStore.articles
-  } finally {
-    isSearching.value = false
-  }
+// 🚀 核心改动：加入了 300ms 的防抖过滤层
+const performSearch = () => {
+  const query = searchQuery.value.trim()
+  if (!query) return
+
+  // 如果用户在 300 毫秒内再次敲击键盘，直接掐断上一次的计划，重新计时
+  if (debounceTimer) clearTimeout(debounceTimer)
+
+  debounceTimer = setTimeout(async () => {
+    isSearching.value = true
+    try {
+      await blogStore.fetchArticles({ 
+        search: query,
+        page: 1,
+        page_size: 8
+      })
+      searchResults.value = blogStore.articles
+    } catch (error) {
+      console.error('搜索请求失败:', error)
+    } finally {
+      isSearching.value = false
+    }
+  }, 300) // ⏳ 300ms 是兼顾用户打字流畅感与后端抗压的最完美阈值
 }
 
 onMounted(() => {
@@ -98,6 +122,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('open-search', openSearch)
+  if (debounceTimer) clearTimeout(debounceTimer)
 })
 </script>
 

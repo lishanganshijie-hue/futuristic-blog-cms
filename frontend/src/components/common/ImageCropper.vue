@@ -398,7 +398,11 @@ const scaleState = ref({ x: 1, y: 1 })
 
 const activeTooltip = ref<string | null>(null)
 
+// ⏳ 挂载局部防漏计时器，收紧内存看守线
+let initTimer: ReturnType<typeof setTimeout> | null = null
+
 const showTooltip = (name: string) => {
+  if (!cropperReady.value) return
   activeTooltip.value = name
 }
 
@@ -465,7 +469,8 @@ const initCropper = async () => {
   try {
     await loadImage()
 
-    await new Promise(resolve => setTimeout(resolve, 50))
+    // 动作锁：防止异步加载阶段中途用户已经无情关掉了 Modal
+    if (!props.modelValue) return
 
     const cropperOptions: Cropper.Options = {
       viewMode: 1,
@@ -499,44 +504,39 @@ const initCropper = async () => {
   }
 }
 
-const handleZoomIn = () => {
+// 🛠️ 抽象控制管线：扼杀异步环境或连续点按可能引发的 Tooltip 残留 Bug
+const executeAction = (action: () => void) => {
   if (!cropperInstance.value || !cropperReady.value) return
-  cropperInstance.value.zoom(0.1)
+  action()
+  hideTooltip()
 }
 
-const handleZoomOut = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  cropperInstance.value.zoom(-0.1)
-}
-
-const handleRotateLeft = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  cropperInstance.value.rotate(-90)
-}
-
-const handleRotateRight = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  cropperInstance.value.rotate(90)
-}
+const handleZoomIn = () => executeAction(() => cropperInstance.value!.zoom(0.1))
+const handleZoomOut = () => executeAction(() => cropperInstance.value!.zoom(-0.1))
+const handleRotateLeft = () => executeAction(() => cropperInstance.value!.rotate(-90))
+const handleRotateRight = () => executeAction(() => cropperInstance.value!.rotate(90))
 
 const handleFlipHorizontal = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  const newX = scaleState.value.x === 1 ? -1 : 1
-  cropperInstance.value.scaleX(newX)
-  scaleState.value.x = newX
+  executeAction(() => {
+    const newX = scaleState.value.x === 1 ? -1 : 1
+    cropperInstance.value!.scaleX(newX)
+    scaleState.value.x = newX
+  })
 }
 
 const handleFlipVertical = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  const newY = scaleState.value.y === 1 ? -1 : 1
-  cropperInstance.value.scaleY(newY)
-  scaleState.value.y = newY
+  executeAction(() => {
+    const newY = scaleState.value.y === 1 ? -1 : 1
+    cropperInstance.value!.scaleY(newY)
+    scaleState.value.y = newY
+  })
 }
 
 const handleReset = () => {
-  if (!cropperInstance.value || !cropperReady.value) return
-  cropperInstance.value.reset()
-  scaleState.value = { x: 1, y: 1 }
+  executeAction(() => {
+    cropperInstance.value!.reset()
+    scaleState.value = { x: 1, y: 1 }
+  })
 }
 
 const handleConfirm = async () => {
@@ -590,12 +590,16 @@ const handleCancel = () => {
 }
 
 const destroyCropper = () => {
+  if (initTimer) {
+    clearTimeout(initTimer)
+    initTimer = null
+  }
   if (cropperInstance.value) {
     cropperInstance.value.destroy()
     cropperInstance.value = null
   }
   cropperReady.value = false
-  scaleState.value = { x: 1, y: 1 }
+  hideTooltip()
 }
 
 watch(() => props.modelValue, async (newValue) => {
@@ -606,8 +610,11 @@ watch(() => props.modelValue, async (newValue) => {
     
     await nextTick()
     
+    // 🔍 异步执行阀门：快速闪烁或重置状态时清空此前堆叠的异步定时器
     requestAnimationFrame(() => {
-      setTimeout(initCropper, 100)
+      if (!props.modelValue) return
+      if (initTimer) clearTimeout(initTimer)
+      initTimer = setTimeout(initCropper, 100)
     })
   } else {
     destroyCropper()
@@ -639,7 +646,7 @@ onUnmounted(() => {
 .cropper-image {
   display: block;
   max-width: 100%;
-  opacity: 0;
+  /* 🪄 改动：移除了妨碍插件接管初始化计算的强制 opacity:0，由插件自行隐式驱动 */
 }
 
 .cropper-btn {
