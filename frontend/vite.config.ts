@@ -69,7 +69,9 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
+        // 👇 就是替换了这整段 manualChunks 逻辑
         manualChunks: (id) => {
+          // === 1. 第三方依赖库拦截 (node_modules) ===
           if (id.includes('node_modules')) {
             if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) {
               return 'vue-vendor'
@@ -83,28 +85,32 @@ export default defineConfig({
             if (id.includes('marked') || id.includes('highlight.js') || id.includes('dompurify')) {
               return 'markdown'
             }
-            if (id.includes('pdfjs')) {
-              return 'pdfjs'
-            }
-            if (id.includes('xlsx') || id.includes('jszip')) {
-              return 'xlsx'
-            }
-            if (id.includes('mammoth')) {
-              return 'mammoth'
-            }
             if (id.includes('axios')) {
               return 'axios'
+            }
+            if (id.includes('pdfjs') || id.includes('mammoth') || id.includes('xlsx') || id.includes('jszip')) {
+              return 'document-libs'
             }
             if (id.includes('cropperjs')) {
               return 'cropperjs'
             }
-            if (id.includes('particles.js')) {
-              return 'particles'
-            }
-            if (id.includes('@vueuse')) {
-              return 'vueuse'
-            }
             return 'vendor'
+          }
+
+          // === 2. 咱们自己的后台源码拦截 (src/) ===
+          // 只要发现代码来自后台 views 或后台 components，强行扔进独立分包
+          if (id.includes('src/views/admin/') || id.includes('src/components/admin/')) {
+            return 'admin-ui'
+          }
+
+          // 只要发现这些 API 是后台专用的，强行隔离，切断大桶文件的全家桶连带效应
+          if (
+            id.includes('src/api/dashboard') || 
+            id.includes('src/api/logs') || 
+            id.includes('src/api/permissions') || 
+            id.includes('src/api/roles')
+          ) {
+            return 'admin-api'
           }
         },
         chunkFileNames: 'assets/js/[name]-[hash].js',
@@ -125,7 +131,7 @@ export default defineConfig({
         }
       }
     },
-    chunkSizeWarningLimit: 2000,
+    chunkSizeWarningLimit: 1000,
     cssCodeSplit: true,
     sourcemap: false,
     reportCompressedSize: true,
