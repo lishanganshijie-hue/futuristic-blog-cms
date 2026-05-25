@@ -15,7 +15,8 @@ const dialog = useDialogStore()
 
 const isMenuOpen = ref(false)
 const isDesktopDropdownOpen = ref(false)
-const AvatarCropper = defineAsyncComponent(() => import('./AvatarCropper.vue'))
+// 把下面这行代码注释掉即可：
+// const AvatarCropper = defineAsyncComponent(() => import('./AvatarCropper.vue'))
 
 const navLinks = computed(() => [
   { name: '首页', path: '/' },
