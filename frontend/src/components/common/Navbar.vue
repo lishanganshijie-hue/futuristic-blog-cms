@@ -15,8 +15,6 @@ const dialog = useDialogStore()
 
 const isMenuOpen = ref(false)
 const isDesktopDropdownOpen = ref(false)
-// 把下面这行代码注释掉即可：
-// const AvatarCropper = defineAsyncComponent(() => import('./AvatarCropper.vue'))
 
 const navLinks = computed(() => [
   { name: '首页', path: '/' },
@@ -108,7 +106,7 @@ onMounted(() => {
           >
             <img
               :src="getLogoUrl(siteConfigStore.siteLogoUrl)"
-              :alt="siteConfigStore.siteName"
+              :alt="`${siteConfigStore.siteName || '站点'} Logo`"
               class="w-full h-full object-contain"
             >
           </div>
@@ -119,6 +117,7 @@ onMounted(() => {
             <svg
               viewBox="0 0 100 100"
               class="w-6 h-6"
+              aria-hidden="true"
             >
               <defs>
                 <linearGradient
@@ -181,6 +180,8 @@ onMounted(() => {
         <div class="flex items-center gap-2">
           <button
             data-search-modal
+            aria-label="搜索网站文章"
+            title="搜索网站文章"
             class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-white/5 rounded-lg text-gray-400 hover:text-primary hover:border-primary/30 transition-all"
             @click="openSearch"
           >
@@ -189,6 +190,7 @@ onMounted(() => {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"
@@ -202,6 +204,8 @@ onMounted(() => {
           </button>
 
           <button
+            :aria-label="themeStore.isDark ? '切换至浅色模式' : '切换至深色模式'"
+            :title="themeStore.isDark ? '切换至浅色模式' : '切换至深色模式'"
             class="p-1.5 rounded-lg bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-white/5 hover:border-primary/30 hover:text-primary transition-all"
             @click="themeStore.toggleTheme"
           >
@@ -211,6 +215,7 @@ onMounted(() => {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"
@@ -225,6 +230,7 @@ onMounted(() => {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"
@@ -247,6 +253,8 @@ onMounted(() => {
             class="hidden md:flex items-center relative desktop-dropdown-container"
           >
             <button
+              :aria-label="isDesktopDropdownOpen ? '关闭用户菜单' : '展开用户菜单'"
+              :aria-expanded="isDesktopDropdownOpen"
               class="p-1.5 rounded-lg bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-white/5 hover:border-primary/30 hover:text-primary transition-all"
               @click="isDesktopDropdownOpen = !isDesktopDropdownOpen"
             >
@@ -255,6 +263,7 @@ onMounted(() => {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   stroke-linecap="round"
@@ -321,6 +330,7 @@ onMounted(() => {
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
                       <path
                         stroke-linecap="round"
@@ -342,6 +352,7 @@ onMounted(() => {
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
                       <path
                         stroke-linecap="round"
@@ -363,6 +374,7 @@ onMounted(() => {
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
                       <path
                         stroke-linecap="round"
@@ -391,6 +403,7 @@ onMounted(() => {
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
                       <path
                         stroke-linecap="round"
@@ -407,6 +420,8 @@ onMounted(() => {
           </div>
 
           <button
+            :aria-label="isMenuOpen ? '关闭导航菜单' : '打开导航菜单'"
+            :aria-expanded="isMenuOpen"
             class="md:hidden p-1.5 rounded-lg bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-white/5 hover:border-primary/30 transition-all"
             @click="isMenuOpen = !isMenuOpen"
           >
@@ -416,6 +431,7 @@ onMounted(() => {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"
@@ -430,6 +446,7 @@ onMounted(() => {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"
