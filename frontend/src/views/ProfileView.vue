@@ -568,6 +568,7 @@ watch(() => route.path, (newPath) => {
                       </span>
                     </span>
                     <button
+                      :aria-label="article.is_liked ? '取消点赞' : '点赞'"
                       class="article-meta-item article-action-btn relative text-inherit"
                       @click="handleLike($event, article)"
                       @mouseenter="showTooltip(article.id, 'like')"
@@ -595,6 +596,7 @@ watch(() => route.path, (newPath) => {
                       </span>
                     </button>
                     <button
+                      aria-label="查看评论"
                       class="article-meta-item article-action-btn relative text-inherit"
                       @click="goToComments($event, article.slug)"
                       @mouseenter="showTooltip(article.id, 'comment')"
@@ -622,6 +624,7 @@ watch(() => route.path, (newPath) => {
                       </span>
                     </button>
                     <button
+                      :aria-label="article.is_bookmarked ? '取消收藏' : '收藏'"
                       :class="[
                         'article-meta-item article-action-btn relative text-inherit',
                         { 'text-amber-500': article.is_bookmarked }
