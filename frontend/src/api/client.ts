@@ -69,16 +69,17 @@ const addPendingRequest = (config: InternalAxiosRequestConfig) => {
   pendingRequests.set(key, { controller, timestamp: Date.now() })
 }
 
+// 🚀 这里的正则表达式语法已修正，消灭 TS1161 和 TS1127 编译错误
 const nonCacheablePatterns = [
-  \/auth\/,
-  \/comments\/,
-  \/likes\/,
-  \/logs\/,
-  \/notifications\/,
-  \/upload/,
-  \/delete/,
-  \/create/,
-  \/update/
+  /\/auth\//,
+  \/comments\//,
+  \/likes\//,
+  \/logs\//,
+  \/notifications\//,
+  /\/upload/,
+  /\/delete/,
+  /\/create/,
+  /\/update/
 ]
 
 const isNonCacheable = (url: string | undefined): boolean => {
@@ -176,10 +177,8 @@ apiClient.interceptors.response.use(
       return Promise.reject(cancelError)
     }
     
-    // 🚀 重新设计的 401 未授权处理机制
     if (error.response?.status === 401 && originalConfig && !originalConfig._retry) {
       
-      // 辅助函数：用来判断当前页面需不需要强制跳登录页
       const handleAuthFailureAndRedirect = () => {
         localStorage.removeItem('token')
         localStorage.removeItem('refresh_token')
@@ -188,11 +187,11 @@ apiClient.interceptors.response.use(
         
         const currentPath = window.location.pathname
         
-        // 核心改动：只有在“管理后台”或“个人中心”等受保护的页面，才强制弹回登录页
+        // 核心改动：只有在管理后台（/admin）或个人中心（/profile），才强制弹回登录页
         if (currentPath.startsWith('/admin') || currentPath === '/profile') {
           window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`
         } else {
-          // 如果是前台首页、关于我等普通页面，Token 坏了直接静默清除，转为游客身份，顺便静默刷新下数据，绝对不跳转！
+          // 如果是前台公开页面，Token坏了直接清空并刷新转游客，不强制跳转登录
           console.warn('登录会话已过期，已自动转为游客模式浏览')
           window.location.reload()
         }
