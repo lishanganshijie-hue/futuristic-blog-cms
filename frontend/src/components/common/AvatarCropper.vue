@@ -161,7 +161,7 @@
                     v-if="activeTooltip === 'rotateleft'"
                     class="action-tooltip"
                   >
-                    向向左旋转
+                    向左旋转
                   </span>
                 </button>
                 <button
@@ -296,7 +296,7 @@
                     class="preview-container w-40 h-40 rounded-lg overflow-hidden bg-gray-100 dark:bg-dark-100 border-2 border-gray-200 dark:border-white/10 mx-auto"
                   />
                   <p class="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
-                    200 × 200 px
+                    高清输出尺寸
                   </p>
                 </div>
                 <div>
@@ -305,7 +305,7 @@
                     class="preview-container w-20 h-20 rounded-full overflow-hidden bg-gray-100 dark:bg-dark-100 border-2 border-gray-200 dark:border-white/10 mx-auto"
                   />
                   <p class="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
-                    80 × 80 px
+                    圆形视差展示
                   </p>
                 </div>
               </div>
@@ -395,7 +395,6 @@ const scaleState = ref({ x: 1, y: 1 })
 
 const activeTooltip = ref<string | null>(null)
 
-// ⏳ 防御型：本地挂载初始化防抖定时器，扼杀内存泄漏
 let initTimer: ReturnType<typeof setTimeout> | null = null
 
 const showTooltip = (name: string) => {
@@ -456,7 +455,6 @@ const initCropper = async () => {
   try {
     await loadImage()
 
-    // 再次校准：异步加载期间如果用户已经关了 Modal，则直接叫停初始化
     if (!props.modelValue) return
 
     cropperInstance.value = new Cropper(imageRef.value!, {
@@ -484,7 +482,6 @@ const initCropper = async () => {
   }
 }
 
-// 🛠️ 统一动作控制流：防止按钮禁用后导致浏览器丢失 mouseleave 引发的 Tooltip 卡死现象
 const executeAction = (action: () => void) => {
   if (!cropperInstance.value || !cropperReady.value) return
   action()
@@ -525,9 +522,11 @@ const handleConfirm = async () => {
   isProcessing.value = true
 
   try {
+    // 🚀 高清升级核心：把兜底分辨率从普通的 200px 提升到 600px 视网膜高清标准！
+    // 既保障了超清显示，又不会因为像素过大（如几千像素）导致单张头像撑爆 R2 存储与 CDN 流量
     const canvas = cropperInstance.value.getCroppedCanvas({
-      width: props.outputWidth || 200,
-      height: props.outputHeight || 200,
+      width: props.outputWidth || 600,
+      height: props.outputHeight || 600,
       imageSmoothingEnabled: true,
       imageSmoothingQuality: 'high'
     })
@@ -541,7 +540,7 @@ const handleConfirm = async () => {
           else reject(new Error('Failed to create blob'))
         },
         'image/jpeg',
-        props.outputQuality || 0.9
+        props.outputQuality || 0.92 // 🚀 轻微提升画质保留率到 92%
       )
     })
 
@@ -580,7 +579,6 @@ watch(() => props.modelValue, async (newValue) => {
     
     await nextTick()
     
-    // 🚀 双向队列看守：确保外部环境在极短时间内连续切换弹窗时，上一次的延迟初始化会被无情掐断
     requestAnimationFrame(() => {
       if (!props.modelValue) return
       if (initTimer) clearTimeout(initTimer)
@@ -608,7 +606,6 @@ onUnmounted(() => {
 .cropper-image {
   display: block;
   max-width: 100%;
-  /* 🪄 改动：移除了强制不透明度为0的操作，交由插件去安全操纵图层显隐 */
 }
 
 .cropper-btn {
@@ -703,7 +700,7 @@ onUnmounted(() => {
 }
 
 .cropper-bg {
-  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA3NCSVQICAjb4U/gAAAABlBMVEXMzMz////TjRV2AAAACXBIWXMAAAs7AAAOzAGDnqGQAAAAHHRFWHRTb2Z0d2FyZQBBZG9iZSBGaXJld29ya3MgQ1MzmGaGAAAAFnRFWHRDcmVhdGlvbiBUaW1lADAxLzA0LzE1O4XJggAAABZ0RVh0U29mdHdhcmUAcGFpbnQubmV0IDQuMC41ZYBSAAAAQklEQVQImWNgQAX8jP/PwMDw////Z2NkZGRkZGQDyLAyiGZgYGBgYGBgYHj4+P8M8f3HwWDHwMDwB6h0ZqCJAAACoQgN9mWmrQAAAABJRU5ErkJggg==");
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA3NCSVQICAjb4U/gAAAABlBMVEXMzMz////TjRV2AAAACXBIWXMAAAs7AAAOzAGDnqGQAAAAHHRFWHRTb2Z0d2FyZQBBZG9iZSBGaXJld29ya3MgQ1MzmGaGAAAAFnRFWHRDcmVhdGlvbiBUaW1lADAxLzA0LzE1O4XJggAAABZ0RVh0U29mdHdhcmUAcGFpbnQubmV0IDQuMC41ZYBSAAAAQklEQVQImWNgQAX8jP/PwMDw////Z2NkZGRkZGQDyLAyiGZgYGBgYGBgYHj4+P8M8f3HwWDHwMDw/qh0ZqCJAAACoQgN9mWmrQAAAABJRU5ErkJggg==");
 }
 
 .cropper-preview {

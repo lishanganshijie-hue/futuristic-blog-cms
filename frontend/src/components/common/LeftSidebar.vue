@@ -131,7 +131,6 @@ onMounted(() => {
           :src="getLogoUrl(adminAvatar)"
           :alt="`${siteConfigStore.siteName} 的个人头像`"
           class="mx-auto lg:w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          crossorigin="anonymous"
           loading="eager"
           fetchpriority="high"
         >
