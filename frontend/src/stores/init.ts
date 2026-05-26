@@ -75,17 +75,19 @@ export const useInitStore = defineStore('init', () => {
           blogStore.publicStats = data.public_stats
         }
         
-        // 🚀 双重状态校验：防止失效 Token 导致的路由强跳
+        // 双重状态校验：防止失效 Token 导致的路由强跳
         if (authStore.isAuthenticated) {
           if (!data.user_profile) {
             console.warn('Init check: Token invalid on server, resetting to guest mode.')
             localStorage.removeItem('token')
             localStorage.removeItem('refresh_token')
             localStorage.removeItem('token_expiry')
+            
+            // 🚀 修复 TS2540 错误：优先调用注销方法，或使用 $patch 绕过只读属性赋值限制
             if (typeof authStore.logout === 'function') {
               authStore.logout()
             } else {
-              authStore.isAuthenticated = false
+              authStore.$patch({ isAuthenticated: false })
             }
           } else {
             userProfileStore.profile = data.user_profile
