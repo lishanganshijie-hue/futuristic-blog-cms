@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
-import { useSiteConfigStore, useSocialLinksStore, useBlogStore } from '@/stores'
+import { useSiteConfigStore, useSocialLinksStore, useBlogStore, useUserProfileStore } from '@/stores'
 
 const siteConfigStore = useSiteConfigStore()
 const socialLinksStore = useSocialLinksStore()
 const blogStore = useBlogStore()
+const userProfileStore = useUserProfileStore() // 🚀 实例化后台用户资料 Store
 
 const activeTooltip = ref<string | null>(null)
 
@@ -33,6 +34,14 @@ const getLogoUrl = (url: string) => {
   if (url.startsWith('/')) return url
   return `/${url}`
 }
+
+// 🚀 核心新增：锁定后台上传的自定义原图头像，若没有则使用站点 Logo 兜底
+const adminAvatar = computed(() => {
+  if (userProfileStore.profile?.avatar_url) {
+    return userProfileStore.profile.avatar_url
+  }
+  return siteConfigStore.siteLogoUrl || ''
+})
 
 const handleEmailClick = (e: MouseEvent, rawUrl: string) => {
   if (!rawUrl.startsWith('mailto:')) return
@@ -97,6 +106,8 @@ watch(() => siteConfigStore.showGithubStats, (show) => {
 
 onMounted(() => {
   socialLinksStore.fetchProfile()
+  // 🚀 核心新增：前台挂载时拉取一次管理员个人资料，确保存储库中同步到最新的头像路径
+  userProfileStore.fetchProfile().catch((err) => console.error('前台获取管理员头像失败:', err))
 })
 </script>
 
@@ -116,8 +127,8 @@ onMounted(() => {
         </div>
         
         <img
-          v-if="siteConfigStore.siteLogoUrl"
-          :src="getLogoUrl(siteConfigStore.siteLogoUrl)"
+          v-if="adminAvatar"
+          :src="getLogoUrl(adminAvatar)"
           :alt="`${siteConfigStore.siteName} 的个人头像`"
           class="mx-auto lg:w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           crossorigin="anonymous"
@@ -280,7 +291,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 1. 独属于前台左侧边栏的高性能淡入动画（不引发回流重绘） */
 .animate-fade-in {
   animation: sidebarFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -296,7 +306,6 @@ onMounted(() => {
   }
 }
 
-/* 2. 内部公告内容的微调平滑载入 */
 .animate-subtle-fade {
   animation: subtleFadeIn 0.3s ease-out forwards;
 }
@@ -306,7 +315,6 @@ onMounted(() => {
   to { opacity: 1; }
 }
 
-/* 提示气泡原本的样式 */
 .action-tooltip {
   position: absolute;
   bottom: calc(100% + 10px);
