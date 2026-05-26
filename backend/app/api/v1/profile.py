@@ -94,37 +94,12 @@ async def get_profile(db: Session = Depends(get_db)):
 
 
 @router.put("", response_model=ProfileResponse)
-@router.put("", response_model=ProfileResponse)
 async def update_profile(
     profile_data: ProfileUpdate,
     request: Request,
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("profile.edit"))
 ):
-    # ==================== 🚀 网页端免终端一键升级数据库（用完可删） ====================
-    from sqlalchemy import text
-    try:
-        sql = """
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500);
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_tech_stack BOOLEAN DEFAULT TRUE;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_journey BOOLEAN DEFAULT TRUE;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_education BOOLEAN DEFAULT TRUE;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_exploration BOOLEAN DEFAULT TRUE;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_basic INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_banner INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_tech_stack INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_journey INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_education INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_exploration INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_social INTEGER DEFAULT 0;
-        """
-        db.execute(text(sql))
-        db.commit()
-    except Exception as db_err:
-        db.rollback()
-        print(f"数据库升级提示: {db_err}")
-    # ==============================================================================
-
     profile = get_or_create_profile(db)
     
     update_data = profile_data.model_dump(exclude_unset=True)
@@ -157,20 +132,31 @@ async def update_profile(
         status="success"
     )
     
-    # 💡 临时用一个新的字典返回，确保这几个新列能顺利带给前端
-    res_dict = profile_to_response(profile)
-    res_dict.update({
-        "avatar_url": getattr(profile, "avatar_url", None),
-        "show_tech_stack": getattr(profile, "show_tech_stack", True),
-        "show_journey": getattr(profile, "show_journey", True),
-        "show_education": getattr(profile, "show_education", True),
-        "show_exploration": getattr(profile, "show_exploration", True),
-        "order_basic": getattr(profile, "order_basic", 0),
-        "order_banner": getattr(profile, "order_banner", 0),
-        "order_tech_stack": getattr(profile, "order_tech_stack", 0),
-        "order_journey": getattr(profile, "order_journey", 0),
-        "order_education": getattr(profile, "order_education", 0),
-        "order_exploration": getattr(profile, "order_exploration", 0),
-        "order_social": getattr(profile, "order_social", 0),
-    })
-    return res_dict
+    return profile_to_response(profile)
+# ==================== 🚀 专属安全数据库升级接口（用完即删） ====================
+@router.get("/db-upgrade-now-2026")
+async def force_upgrade_database(db: Session = Depends(get_db)):
+    from sqlalchemy import text
+    try:
+        sql = """
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500);
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_tech_stack BOOLEAN DEFAULT TRUE;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_journey BOOLEAN DEFAULT TRUE;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_education BOOLEAN DEFAULT TRUE;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_exploration BOOLEAN DEFAULT TRUE;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_basic INTEGER DEFAULT 0;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_banner INTEGER DEFAULT 0;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_tech_stack INTEGER DEFAULT 0;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_journey INTEGER DEFAULT 0;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_education INTEGER DEFAULT 0;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_exploration INTEGER DEFAULT 0;
+        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_social INTEGER DEFAULT 0;
+        """
+        db.execute(text(sql))
+        db.commit()
+        return {"status": "success", "msg": "恭喜！12个新字段已经全部成功注入 profiles 表中！"}
+    except Exception as e:
+        db.rollback()
+        # 把真正的错误吐出来，方便我们排查
+        return {"status": "failed", "error_detail": str(e)}
+# ==============================================================================
