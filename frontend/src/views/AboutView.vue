@@ -15,6 +15,12 @@ const isLoading = ref(true)
 const hasError = ref(false)
 const socialLinksStore = useSocialLinksStore()
 
+// 动态处理自定义展示图/Banner 的 URL，防缓存
+const getBannerUrl = (url: string | undefined) => {
+  if (!url) return ''
+  return `${url}?v=${profileCache?.timestamp || Date.now()}`
+}
+
 const fetchProfile = async (force = false) => {
   const now = Date.now()
   if (!force && profileCache && now - profileCache.timestamp < CACHE_TTL) {
@@ -69,15 +75,6 @@ onActivated(() => {
     </div>
     
     <div class="flex-1 min-w-0 lg:order-2">
-      <div class="mb-8">
-        <h1 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          关于我
-        </h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400">
-          了解博主的技术背景与成长历程
-        </p>
-      </div>
-
       <div
         v-if="isLoading"
         class="flex justify-center py-16"
@@ -112,66 +109,62 @@ onActivated(() => {
       </div>
 
       <template v-else-if="profile">
+        
+        <div 
+          v-if="profile.avatar_url" 
+          class="glass-card mb-6 overflow-hidden w-full aspect-[2.5/1] sm:aspect-[3.5/1] md:aspect-[4/1] relative group"
+        >
+          <img 
+            :src="getBannerUrl(profile.avatar_url)" 
+            alt="Profile Banner"
+            class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]"
+          />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
+        </div>
         <div class="glass-card p-6 md:p-8 mb-6">
-          <div class="flex flex-col sm:flex-row items-center gap-6">
-            <div class="relative">
-              <div class="w-24 h-24 md:w-28 md:h-28 rounded-full bg-primary p-0.5">
-                <div class="w-full h-full rounded-full bg-gray-100 dark:bg-dark-100 flex items-center justify-center text-3xl md:text-4xl font-bold text-primary">
-                  {{ profile.name?.charAt(0)?.toUpperCase() || 'T' }}{{ profile.name?.charAt(1)?.toUpperCase() || 'E' }}
-                </div>
-              </div>
-              <div class="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-cyber-green flex items-center justify-center">
-                <svg
-                  class="w-3.5 h-3.5 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2.5"
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
-            </div>
-
-            <div class="flex-1 text-center sm:text-left">
-              <h2 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-1">
+          <div class="text-left">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+              <h2 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
                 {{ profile.name }}
+                <span class="flex h-2.5 w-2.5 relative">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-green opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyber-green"></span>
+                </span>
               </h2>
               <p
                 v-if="profile.alias"
-                class="text-base text-gray-400 mb-2"
+                class="text-sm md:text-base text-gray-400 dark:text-gray-500 font-mono"
               >
-                {{ profile.alias }}
-              </p>
-              <p
-                v-if="profile.slogan"
-                class="text-primary font-medium text-sm mb-3"
-              >
-                {{ profile.slogan }}
-              </p>
-              <div
-                v-if="profile.tags?.length"
-                class="flex flex-wrap justify-center sm:justify-start gap-1.5 mb-3"
-              >
-                <span
-                  v-for="tag in profile.tags"
-                  :key="tag"
-                  class="px-2.5 py-0.5 bg-primary/10 border border-primary/20 rounded-full text-primary text-xs font-medium"
-                >
-                  {{ tag }}
-                </span>
-              </div>
-              <p
-                v-if="profile.bio"
-                class="text-gray-600 dark:text-gray-300 text-sm leading-relaxed"
-              >
-                {{ profile.bio }}
+                @{{ profile.alias }}
               </p>
             </div>
+            
+            <p
+              v-if="profile.slogan"
+              class="text-primary font-medium text-sm md:text-base mb-4"
+            >
+              {{ profile.slogan }}
+            </p>
+            
+            <div
+              v-if="profile.tags?.length"
+              class="flex flex-wrap gap-1.5 mb-4"
+            >
+              <span
+                v-for="tag in profile.tags"
+                :key="tag"
+                class="px-2.5 py-0.5 bg-primary/10 border border-primary/20 rounded-full text-primary text-xs font-medium"
+              >
+                {{ tag }}
+              </span>
+            </div>
+            
+            <p
+              v-if="profile.bio"
+              class="text-gray-600 dark:text-gray-300 text-sm leading-relaxed border-l-2 border-primary/30 pl-3.5 mt-2 font-normal"
+            >
+              {{ profile.bio }}
+            </p>
           </div>
         </div>
 
@@ -392,7 +385,7 @@ onActivated(() => {
                 />
               </svg>
               <svg
-                v-else-if="link.icon === 'blog'"
+                v-if="link.icon === 'blog'"
                 class="w-4 h-4"
                 fill="none"
                 stroke="currentColor"
