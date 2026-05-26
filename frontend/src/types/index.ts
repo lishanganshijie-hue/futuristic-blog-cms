@@ -271,13 +271,14 @@ export interface Profile {
   social_email?: string
   updated_at: string
 
-  // ==== 🚀 在这里追加下面这堆新字段，直接消灭全局 12 处构建错误 ====
+  // ==== 🚀 追加的字段，确保补上 show_social ====
   avatar_url?: string
   
   show_tech_stack?: boolean
   show_journey?: boolean
   show_education?: boolean
   show_exploration?: boolean
+  show_social?: boolean          // 👈 加上这一行，彻底解决刚才的打包报错！
 
   order_basic?: number
   order_banner?: number
