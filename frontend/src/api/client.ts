@@ -69,7 +69,7 @@ const addPendingRequest = (config: InternalAxiosRequestConfig) => {
   pendingRequests.set(key, { controller, timestamp: Date.now() })
 }
 
-// 🚀 核心重构：使用纯净的字符串数组构建正则，彻底杜绝隐藏字符导致的编译中断
+// 采用安全的纯字符串过滤，规避打包编译隐形字符坑
 const nonCacheableStrings = [
   '/auth/',
   '/comments/',
@@ -179,21 +179,20 @@ apiClient.interceptors.response.use(
     
     if (error.response?.status === 401 && originalConfig && !originalConfig._retry) {
       
+      // 温和的响应策略：不搞自动刷新，不搞循环重试
       const handleAuthFailureAndRedirect = () => {
-        localStorage.removeItem('token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('token_expiry')
-        cacheManager.clear()
-        
         const currentPath = window.location.pathname
         
-        // 只有管理端或个人中心才拦截去登录页
+        // 🔒 只有当你处于后台管理系统页面或者个人中心时，Token失效才需要去登录页
         if (currentPath.startsWith('/admin') || currentPath === '/profile') {
+          localStorage.removeItem('token')
+          localStorage.removeItem('refresh_token')
+          localStorage.removeItem('token_expiry')
+          cacheManager.clear()
           window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`
         } else {
-          // 前台公开页面无感刷新为游客模式
-          console.warn('登录会话已过期，已自动转为游客模式浏览')
-          window.location.reload()
+          // 🌸 如果在前台看博客，Token 失效就让它失效，安安静静的，绝对不干扰用户浏览
+          console.warn('Guest mode active due to inactive session.')
         }
       }
 
