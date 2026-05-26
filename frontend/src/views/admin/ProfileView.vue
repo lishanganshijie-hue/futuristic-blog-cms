@@ -106,11 +106,31 @@ const handleSave = async () => {
   
   isSubmitting.value = true
   try {
-    // 提交前自动根据用户的数字排序对内部数组进行一次升序预整理
+    // 1. 提交前自动根据用户的数字排序对内部数组进行一次升序预整理
     form.value.tech_stack.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
     form.value.journey.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
-    await profileApi.updateProfile(form.value)
+    // ==========================================
+    // 🚀 【核心修复】强制将包裹了新字段的全新 form 数据直接塞给 API
+    // ==========================================
+    // 如果原先的 profileApi.updateProfile 内部挑拣字段导致丢失新字段，
+    // 我们在这里直接把最新的 form.value 作为唯一入参硬塞过去。
+    await profileApi.updateProfile({
+      ...form.value,
+      // 强行双重保险确保布尔值和数字原样发送，不被任何地方拦截
+      show_journey: form.value.show_journey,
+      show_education: form.value.show_education,
+      show_tech_stack: form.value.show_tech_stack,
+      show_exploration: form.value.show_exploration,
+      order_basic: Number(form.value.order_basic),
+      order_banner: Number(form.value.order_banner),
+      order_tech_stack: Number(form.value.order_tech_stack),
+      order_journey: Number(form.value.order_journey),
+      order_education: Number(form.value.order_education),
+      order_exploration: Number(form.value.order_exploration),
+      order_social: Number(form.value.order_social),
+    })
+
     await fetchProfile()
     await dialog.showSuccess('保存成功', '成功')
   } catch (error: any) {
