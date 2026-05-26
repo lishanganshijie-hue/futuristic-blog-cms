@@ -75,26 +75,40 @@ export const useInitStore = defineStore('init', () => {
           blogStore.publicStats = data.public_stats
         }
         
+        // 🚀 核心修复逻辑：双重校对状态
         if (authStore.isAuthenticated) {
-          if (data.user_profile) {
+          // 如果后端没返回用户基础档案，说明本地的 Token 是无效的旧Token
+          if (!data.user_profile) {
+            console.warn('Init check: Token invalid on server, resetting to guest mode.')
+            // 彻底清除虚假的已登录状态，恢复清白之身
+            localStorage.removeItem('token')
+            localStorage.removeItem('refresh_token')
+            localStorage.removeItem('token_expiry')
+            if (typeof authStore.logout === 'function') {
+              authStore.logout()
+            } else {
+              authStore.isAuthenticated = false
+            }
+          } else {
+            // Token 确实有效，正常装载用户信息
             userProfileStore.profile = data.user_profile
-          }
-          
-          if (data.liked_article_ids) {
-            userInteractionStore.setLikedIds(data.liked_article_ids)
-          }
-          
-          if (data.bookmarked_article_ids) {
-            userInteractionStore.setBookmarkedIds(data.bookmarked_article_ids)
-          }
-          
-          userInteractionStore.markInitialized()
-          
-          if (data.user_permissions) {
-            const permissionStore = usePermissionStore()
-            permissionStore.myPermissions = data.user_permissions.permissions
-            permissionStore.myRoles = data.user_permissions.roles
-            permissionStore.markReady()
+            
+            if (data.liked_article_ids) {
+              userInteractionStore.setLikedIds(data.liked_article_ids)
+            }
+            
+            if (data.bookmarked_article_ids) {
+              userInteractionStore.setBookmarkedIds(data.bookmarked_article_ids)
+            }
+            
+            userInteractionStore.markInitialized()
+            
+            if (data.user_permissions) {
+              const permissionStore = usePermissionStore()
+              permissionStore.myPermissions = data.user_permissions.permissions
+              permissionStore.myRoles = data.user_permissions.roles
+              permissionStore.markReady()
+            }
           }
         }
         
@@ -109,10 +123,11 @@ export const useInitStore = defineStore('init', () => {
         coreLoading.value = false
         corePromise = null
       }
-    })()
+    }
+  })()
 
-    return corePromise
-  }
+  return corePromise
+}
 
   const initializeArticles = async (params?: {
     page?: number
