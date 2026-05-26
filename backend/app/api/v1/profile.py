@@ -17,42 +17,37 @@ PROFILE_CACHE_TTL = 300
 
 
 def get_or_create_profile(db: Session) -> Profile:
+    """
+    当数据库中没有任何个人资料时，自动初始化一条通用的、去个人化的默认数据作为兜底，
+    避免前端请求因查无数据而崩溃。
+    """
     profile = db.query(Profile).first()
     if not profile:
         profile = Profile(
-            name="Tech Explorer",
-            alias="技术探索者",
-            slogan="Code for Future, Share for Growth",
-            tags=json.dumps(["全栈架构师", "AI 应用探索者", "开源贡献者"], ensure_ascii=False),
-            bio="热爱技术，专注于构建高性能、可扩展的应用系统。在前后端开发、AI应用、DevOps等领域有丰富经验。致力于技术分享，推动开源社区发展。",
+            name="Admin",
+            alias="管理员",
+            slogan="欢迎来到我的个人博客",
+            tags=json.dumps(["全栈工程师", "技术爱好者"], ensure_ascii=False),
+            bio="这里是个人简介占位符，请前往后台管理系统修改并保存您的真实个人资料。",
             tech_stack=json.dumps([
-                {"category": "前端", "items": ["Vue 3", "TypeScript", "Vite", "TailwindCSS", "React", "Next.js"]},
-                {"category": "后端", "items": ["Python", "FastAPI", "Node.js", "PostgreSQL", "Redis", "Docker"]},
-                {"category": "AI/ML", "items": ["PyTorch", "LangChain", "OpenAI API", "Vector DB", "RAG"]},
-                {"category": "DevOps", "items": ["Docker", "Kubernetes", "GitHub Actions", "Nginx", "AWS"]}
+                {"category": "前端", "items": ["Vue", "React"]},
+                {"category": "后端", "items": ["Python", "Node.js"]}
             ], ensure_ascii=False),
             journey=json.dumps([
-                {"period": "2023 - 至今", "company": "Tech Innovation Corp", "position": "高级全栈工程师", "achievements": "主导多个核心产品架构设计，推动团队技术升级，实现系统性能提升 200%"},
-                {"period": "2021 - 2023", "company": "Digital Solutions Ltd", "position": "全栈开发工程师", "achievements": "负责电商平台核心模块开发，日活用户突破 10 万，系统稳定性达 99.9%"},
-                {"period": "2019 - 2021", "company": "Startup Hub", "position": "前端开发工程师", "achievements": "从零搭建前端技术栈，建立组件库和开发规范，团队效率提升 50%"}
+                {"period": "2026 - 至今", "company": "示例公司", "position": "软件工程师", "achievements": "请在后台修改您的工作经历与成就描述。"}
             ], ensure_ascii=False),
             education=json.dumps({
-                "period": "2015 - 2019",
-                "school": "某知名大学",
-                "major": "计算机科学与技术",
+                "period": "2022 - 2026",
+                "school": "示例大学",
+                "major": "计算机科学",
                 "degree": "本科"
             }, ensure_ascii=False),
             exploration_areas=json.dumps([
-                "大前端架构与跨端方案 (Micro-Frontends)",
-                "服务端渲染 (SSR) 与静态站点生成 (SSG)",
-                "AI Agent 与 RAG 应用开发",
-                "高性能 Web API 设计 (GraphQL)",
-                "云原生架构与微服务",
-                "WebAssembly 与边缘计算"
+                "技术研究", "开源探索"
             ], ensure_ascii=False),
-            social_github="https://github.com/techexplorer",
-            social_blog="https://futuristic-blog.com",
-            social_email="hello@futuristic-blog.com"
+            social_github="https://github.com",
+            social_blog="https://example.com",
+            social_email="admin@example.com"
         )
         db.add(profile)
         db.commit()
@@ -62,6 +57,10 @@ def get_or_create_profile(db: Session) -> Profile:
 
 
 def profile_to_response(profile: Profile) -> dict:
+    """
+    将数据库中的 Profile 对象转换为符合前端展示格式的字典（解序列化 JSON），
+    并完美兼容 12 个控制显隐、排序及新头像的扩展字段。
+    """
     return {
         "id": profile.id,
         "name": profile.name,
@@ -77,12 +76,27 @@ def profile_to_response(profile: Profile) -> dict:
         "social_github": profile.social_github,
         "social_blog": profile.social_blog,
         "social_email": profile.social_email,
-        "updated_at": profile.updated_at
+        "updated_at": profile.updated_at,
+        
+        # 🚀 扩展字段返回值（若数据库中没有值，则提供合理的默认值）
+        "avatar_url": getattr(profile, "avatar_url", None),
+        "show_tech_stack": getattr(profile, "show_tech_stack", True),
+        "show_journey": getattr(profile, "show_journey", True),
+        "show_education": getattr(profile, "show_education", True),
+        "show_exploration": getattr(profile, "show_exploration", True),
+        "order_basic": getattr(profile, "order_basic", 0),
+        "order_banner": getattr(profile, "order_banner", 0),
+        "order_tech_stack": getattr(profile, "order_tech_stack", 0),
+        "order_journey": getattr(profile, "order_journey", 0),
+        "order_education": getattr(profile, "order_education", 0),
+        "order_exploration": getattr(profile, "order_exploration", 0),
+        "order_social": getattr(profile, "order_social", 0),
     }
 
 
 @router.get("", response_model=ProfileResponse)
 async def get_profile(db: Session = Depends(get_db)):
+    """获取公开个人资料（带缓存机制）"""
     cached = cache.get(PROFILE_CACHE_KEY)
     if cached:
         return cached
@@ -100,10 +114,12 @@ async def update_profile(
     db: Session = Depends(get_db),
     current_user = Depends(require_permission("profile.edit"))
 ):
+    """更新个人资料资料"""
     profile = get_or_create_profile(db)
     
     update_data = profile_data.model_dump(exclude_unset=True)
     
+    # 动态将前端传来的属性赋值给数据库的模型对象
     for field, value in update_data.items():
         if field in ["tags", "tech_stack", "journey", "education", "exploration_areas"]:
             setattr(profile, field, json.dumps(value, ensure_ascii=False))
@@ -117,8 +133,10 @@ async def update_profile(
         db.rollback()
         raise HTTPException(status_code=400, detail="数据保存失败，请检查输入内容")
     
+    # 清除旧的公开缓存
     cache.delete(PROFILE_CACHE_KEY)
     
+    # 记录操作日志
     LogService.log_operation(
         db=db,
         user_id=current_user.id,
@@ -133,30 +151,3 @@ async def update_profile(
     )
     
     return profile_to_response(profile)
-# ==================== 🚀 专属安全数据库升级接口（用完即删） ====================
-@router.get("/db-upgrade-now-2026")
-async def force_upgrade_database(db: Session = Depends(get_db)):
-    from sqlalchemy import text
-    try:
-        sql = """
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500);
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_tech_stack BOOLEAN DEFAULT TRUE;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_journey BOOLEAN DEFAULT TRUE;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_education BOOLEAN DEFAULT TRUE;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_exploration BOOLEAN DEFAULT TRUE;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_basic INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_banner INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_tech_stack INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_journey INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_education INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_exploration INTEGER DEFAULT 0;
-        ALTER TABLE profiles ADD COLUMN IF NOT EXISTS order_social INTEGER DEFAULT 0;
-        """
-        db.execute(text(sql))
-        db.commit()
-        return {"status": "success", "msg": "恭喜！12个新字段已经全部成功注入 profiles 表中！"}
-    except Exception as e:
-        db.rollback()
-        # 把真正的错误吐出来，方便我们排查
-        return {"status": "failed", "error_detail": str(e)}
-# ==============================================================================
