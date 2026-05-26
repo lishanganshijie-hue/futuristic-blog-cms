@@ -255,6 +255,24 @@ class Profile(Base):
     social_email = Column(String(100), nullable=True)
     updated_at = Column(DateTime, default=get_db_now, onupdate=get_db_now)
 
+    # ==== 🚀 在下面追加这堆新数据库列 ====
+    avatar_url = Column(String(500), nullable=True)
+    
+    # 显示开关（默认开启 True）
+    show_tech_stack = Column(Boolean, default=True)
+    show_journey = Column(Boolean, default=True)
+    show_education = Column(Boolean, default=True)
+    show_exploration = Column(Boolean, default=True)
+    
+    # 排序序号（默认 0）
+    order_basic = Column(Integer, default=0)
+    order_banner = Column(Integer, default=0)
+    order_tech_stack = Column(Integer, default=0)
+    order_journey = Column(Integer, default=0)
+    order_education = Column(Integer, default=0)
+    order_exploration = Column(Integer, default=0)
+    order_social = Column(Integer, default=0)
+
 
 class EmailConfig(Base):
     __tablename__ = "email_configs"
