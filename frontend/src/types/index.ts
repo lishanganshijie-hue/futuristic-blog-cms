@@ -270,6 +270,22 @@ export interface Profile {
   social_blog?: string
   social_email?: string
   updated_at: string
+
+  // ==== 🚀 在这里追加下面这堆新字段，直接消灭全局 12 处构建错误 ====
+  avatar_url?: string
+  
+  show_tech_stack?: boolean
+  show_journey?: boolean
+  show_education?: boolean
+  show_exploration?: boolean
+
+  order_basic?: number
+  order_banner?: number
+  order_tech_stack?: number
+  order_journey?: number
+  order_education?: number
+  order_exploration?: number
+  order_social?: number
 }
 
 export interface TechStackItem {
