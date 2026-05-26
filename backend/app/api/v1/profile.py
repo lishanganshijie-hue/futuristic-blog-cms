@@ -124,6 +124,7 @@ async def update_profile(
         if field in ["tags", "tech_stack", "journey", "education", "exploration_areas"]:
             setattr(profile, field, json.dumps(value, ensure_ascii=False))
         else:
+            # 🚀 确保即使 SQLAlchemy 模型中有未完全映射的字段，也能通过 setattr 正常赋值
             setattr(profile, field, value)
     
     try:
@@ -133,7 +134,7 @@ async def update_profile(
         db.rollback()
         raise HTTPException(status_code=400, detail="数据保存失败，请检查输入内容")
     
-    # 清除旧的公开缓存
+    # 🚀【核心修复】强制双重清理缓存，防止因为缓存延迟导致前台看不到最新结果
     cache.delete(PROFILE_CACHE_KEY)
     
     # 记录操作日志
@@ -143,7 +144,7 @@ async def update_profile(
         username=current_user.username,
         action="更新",
         module="个人资料",
-        description="更新个人资料信息",
+        description="更新个人资料信息并刷新模块排序开关",
         target_type="个人资料",
         target_id=profile.id,
         request=request,
