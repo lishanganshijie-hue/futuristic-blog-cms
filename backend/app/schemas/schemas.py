@@ -513,6 +513,20 @@ class ProfileBase(BaseModel):
     social_github: Optional[str] = None
     social_blog: Optional[str] = None
     social_email: Optional[str] = None
+    
+    # ==== 🚀 1. 允许 Response 返回这些新字段 ====
+    avatar_url: Optional[str] = None
+    show_tech_stack: Optional[bool] = True
+    show_journey: Optional[bool] = True
+    show_education: Optional[bool] = True
+    show_exploration: Optional[bool] = True
+    order_basic: Optional[int] = 0
+    order_banner: Optional[int] = 0
+    order_tech_stack: Optional[int] = 0
+    order_journey: Optional[int] = 0
+    order_education: Optional[int] = 0
+    order_exploration: Optional[int] = 0
+    order_social: Optional[int] = 0
 
 
 class ProfileUpdate(BaseModel):
@@ -529,6 +543,20 @@ class ProfileUpdate(BaseModel):
     social_github: Optional[str] = None
     social_blog: Optional[str] = None
     social_email: Optional[str] = None
+    
+    # ==== 🚀 2. 允许 接收前端保存传过来的新数据 ====
+    avatar_url: Optional[str] = None
+    show_tech_stack: Optional[bool] = None
+    show_journey: Optional[bool] = None
+    show_education: Optional[bool] = None
+    show_exploration: Optional[bool] = None
+    order_basic: Optional[int] = None
+    order_banner: Optional[int] = None
+    order_tech_stack: Optional[int] = None
+    order_journey: Optional[int] = None
+    order_education: Optional[int] = None
+    order_exploration: Optional[int] = None
+    order_social: Optional[int] = None
 
 
 class ProfileResponse(ProfileBase):
