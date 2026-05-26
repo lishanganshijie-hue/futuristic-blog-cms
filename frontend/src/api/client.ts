@@ -69,22 +69,22 @@ const addPendingRequest = (config: InternalAxiosRequestConfig) => {
   pendingRequests.set(key, { controller, timestamp: Date.now() })
 }
 
-// 🚀 这里的正则表达式语法已修正，消灭 TS1161 和 TS1127 编译错误
-const nonCacheablePatterns = [
-  /\/auth\//,
-  \/comments\//,
-  \/likes\//,
-  \/logs\//,
-  \/notifications\//,
-  /\/upload/,
-  /\/delete/,
-  /\/create/,
-  /\/update/
+// 🚀 核心重构：使用纯净的字符串数组构建正则，彻底杜绝隐藏字符导致的编译中断
+const nonCacheableStrings = [
+  '/auth/',
+  '/comments/',
+  '/likes/',
+  '/logs/',
+  '/notifications/',
+  '/upload',
+  '/delete',
+  '/create',
+  '/update'
 ]
 
 const isNonCacheable = (url: string | undefined): boolean => {
   if (!url) return true
-  return nonCacheablePatterns.some(pattern => pattern.test(url))
+  return nonCacheableStrings.some(pattern => url.includes(pattern))
 }
 
 const refreshToken = async (): Promise<string | null> => {
@@ -187,11 +187,11 @@ apiClient.interceptors.response.use(
         
         const currentPath = window.location.pathname
         
-        // 核心改动：只有在管理后台（/admin）或个人中心（/profile），才强制弹回登录页
+        // 只有管理端或个人中心才拦截去登录页
         if (currentPath.startsWith('/admin') || currentPath === '/profile') {
           window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`
         } else {
-          // 如果是前台公开页面，Token坏了直接清空并刷新转游客，不强制跳转登录
+          // 前台公开页面无感刷新为游客模式
           console.warn('登录会话已过期，已自动转为游客模式浏览')
           window.location.reload()
         }
