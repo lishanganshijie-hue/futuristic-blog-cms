@@ -15,7 +15,7 @@ export interface FileUploadResponse {
   preview_count: number
   order: number
   created_at: string
-  avatar_url?: string
+  
 }
 
 export interface StorageFileInfo {
