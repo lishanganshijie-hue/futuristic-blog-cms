@@ -83,11 +83,15 @@ export const useInitStore = defineStore('init', () => {
             localStorage.removeItem('refresh_token')
             localStorage.removeItem('token_expiry')
             
-            // 🚀 修复 TS2540 错误：优先调用注销方法，或使用 $patch 绕过只读属性赋值限制
+            // 🚀 彻底修复：清空真正的 State (token 和 user)，isAuthenticated 自动转为 false
             if (typeof authStore.logout === 'function') {
               authStore.logout()
             } else {
-              authStore.$patch({ isAuthenticated: false })
+              authStore.$patch({
+                token: null,
+                user: null,
+                refreshToken: null
+              })
             }
           } else {
             userProfileStore.profile = data.user_profile
