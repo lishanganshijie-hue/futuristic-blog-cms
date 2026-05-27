@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore, useDialogStore, useUserProfileStore } from '@/stores'
 import { userProfileApi } from '@/api/userProfile'
 import type { UserProfile } from '@/api/userProfile'
-import AvatarCropper from './AvatarCropper.vue'
+//import AvatarCropper from './AvatarCropper.vue'
 
 const props = defineProps<{
   size?: 'sm' | 'md' | 'lg'
@@ -17,6 +17,7 @@ const emit = defineEmits<{
   (e: 'reset'): void
 }>()
 
+const AvatarCropper = defineAsyncComponent(() => import('./AvatarCropper.vue'))
 const router = useRouter()
 const authStore = useAuthStore()
 const dialogStore = useDialogStore()
