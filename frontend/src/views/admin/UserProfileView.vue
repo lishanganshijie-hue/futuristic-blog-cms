@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, defineAsyncComponent } from 'vue'
 import { useAuthStore, useUserProfileStore, useDialogStore } from '@/stores'
 import { userProfileApi } from '@/api/userProfile'
 import { userApi } from '@/api/users'
 import { checkServerHealth } from '@/api/client'
-import AvatarCropper from '@/components/common/AvatarCropper.vue'
+//import AvatarCropper from '@/components/common/AvatarCropper.vue'
 import { useRoleColor } from '@/composables/useRoleColor'
 import { formatDateTime } from '@/utils/date'
 
 const { getRoleColorClasses } = useRoleColor()
-
+const AvatarCropper = defineAsyncComponent(() => import('@/components/common/AvatarCropper.vue'))
 const authStore = useAuthStore()
 const userProfileStore = useUserProfileStore()
 const dialogStore = useDialogStore()

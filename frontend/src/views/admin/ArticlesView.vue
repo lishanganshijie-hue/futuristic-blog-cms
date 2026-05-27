@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onUnmounted, nextTick, computed } from 'vue'
+import { ref, onMounted, watch, onUnmounted, nextTick, computed, defineAsyncComponent } from 'vue'
 import { useBlogStore, useDialogStore, usePermissionStore } from '@/stores'
 import { articleApi, fileApi, categoryApi, tagApi, utilsApi, parseUploadError } from '@/api'
 import { clearCacheByPattern } from '@/api/client'
@@ -15,6 +15,7 @@ import ImageCropper from '@/components/common/ImageCropper.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import DateTimePicker from '@/components/common/DateTimePicker.vue'
 
+const ImageCropper = defineAsyncComponent(() => import('@/components/common/ImageCropper.vue'))
 const blogStore = useBlogStore()
 const dialog = useDialogStore()
 const permissionStore = usePermissionStore()
