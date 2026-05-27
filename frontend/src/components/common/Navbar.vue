@@ -206,7 +206,7 @@ onMounted(() => {
           <button
             :aria-label="themeStore.isDark ? '切换至浅色模式' : '切换至深色模式'"
             :title="themeStore.isDark ? '切换至浅色模式' : '切换至深色模式'"
-            class="p-1.5 rounded-lg bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-white/5 hover:border-primary/30 hover:text-primary transition-all"
+            class="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-white/5 hover:border-primary/30 hover:text-primary transition-all"
             @click="themeStore.toggleTheme"
           >
             <svg
@@ -254,8 +254,9 @@ onMounted(() => {
           >
             <button
               :aria-label="isDesktopDropdownOpen ? '关闭用户菜单' : '展开用户菜单'"
+              :title="isDesktopDropdownOpen ? '关闭用户菜单' : '展开用户菜单'"
               :aria-expanded="isDesktopDropdownOpen"
-              class="p-1.5 rounded-lg bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-white/5 hover:border-primary/30 hover:text-primary transition-all"
+              class="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-white/5 hover:border-primary/30 hover:text-primary transition-all"
               @click="isDesktopDropdownOpen = !isDesktopDropdownOpen"
             >
               <svg
@@ -309,7 +310,7 @@ onMounted(() => {
                       <p class="font-medium text-gray-900 dark:text-white truncate">
                         {{ userProfileStore.profile?.username || authStore.user?.username || '用户' }}
                       </p>
-                      <p class="text-xs text-gray-500 dark:text-gray-400">
+                      <p class="text-xs text-gray-600 dark:text-gray-400">
                         <template v-if="authStore.user?.roles && authStore.user.roles.length > 0">
                           {{ authStore.user.roles.map(r => r.name).join('、') }}
                         </template>
@@ -422,7 +423,7 @@ onMounted(() => {
           <button
             :aria-label="isMenuOpen ? '关闭导航菜单' : '打开导航菜单'"
             :aria-expanded="isMenuOpen"
-            class="md:hidden p-1.5 rounded-lg bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-white/5 hover:border-primary/30 transition-all"
+            class="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-50 dark:bg-dark-300 border border-gray-200 dark:border-white/5 hover:border-primary/30 transition-all"
             @click="isMenuOpen = !isMenuOpen"
           >
             <svg
@@ -513,7 +514,7 @@ onMounted(() => {
                     <p class="font-medium text-gray-900 dark:text-white text-sm truncate">
                       {{ userProfileStore.profile?.username || authStore.user?.username || '用户' }}
                     </p>
-                    <p class="text-xs text-gray-500">
+                    <p class="text-xs text-gray-600 dark:text-gray-400">
                       <template v-if="authStore.user?.roles && authStore.user.roles.length > 0">
                         {{ authStore.user.roles.map(r => r.name).join('、') }}
                       </template>
