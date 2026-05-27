@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed } from 'vue'
 import { useSiteConfigStore, useDialogStore } from '@/stores'
 import { useAdminCheck } from '@/composables/useAdminCheck'
 import { clearCacheByPattern } from '@/api/client'
@@ -14,7 +14,6 @@ const emit = defineEmits<{
   (e: 'reset'): void
 }>()
 
-const AvatarCropper = defineAsyncComponent(() => import('./AvatarCropper.vue'))
 const siteConfigStore = useSiteConfigStore()
 const dialogStore = useDialogStore()
 const { requirePermission } = useAdminCheck()
