@@ -69,7 +69,7 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        // 👇 就是替换了这整段 manualChunks 逻辑
+        // 🚀 完美的 manualChunks 分包拦截逻辑
         manualChunks: (id) => {
           // === 1. 第三方依赖库拦截 (node_modules) ===
           if (id.includes('node_modules')) {
@@ -98,12 +98,10 @@ export default defineConfig({
           }
 
           // === 2. 咱们自己的后台源码拦截 (src/) ===
-          // 只要发现代码来自后台 views 或后台 components，强行扔进独立分包
           if (id.includes('src/views/admin/') || id.includes('src/components/admin/')) {
             return 'admin-ui'
           }
 
-          // 只要发现这些 API 是后台专用的，强行隔离，切断大桶文件的全家桶连带效应
           if (
             id.includes('src/api/dashboard') || 
             id.includes('src/api/logs') || 
