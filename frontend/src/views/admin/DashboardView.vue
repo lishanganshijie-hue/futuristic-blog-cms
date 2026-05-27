@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, defineAsyncComponent } from 'vue' // 🎯 引入 defineAsyncComponent
 import { dashboardApi } from '@/api'
 import { isCancelError } from '@/utils/error'
 import type { 
@@ -10,9 +10,11 @@ import type {
   ArticleViewsRank,
   AccessTrend
 } from '@/api/dashboard'
-import LineChart from '@/components/charts/LineChart.vue'
-import BarChart from '@/components/charts/BarChart.vue'
-import PieChart from '@/components/charts/PieChart.vue'
+
+// 🎯 将同步组件升级为异步组件（按需懒加载，完美避开首屏打包）
+const LineChart = defineAsyncComponent(() => import('@/components/charts/LineChart.vue'))
+const BarChart = defineAsyncComponent(() => import('@/components/charts/BarChart.vue'))
+const PieChart = defineAsyncComponent(() => import('@/components/charts/PieChart.vue'))
 
 const loading = ref(true)
 const overview = ref<OverviewStats | null>(null)
