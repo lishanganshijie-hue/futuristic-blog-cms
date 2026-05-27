@@ -312,7 +312,12 @@ const prefetchMap: Record<string, () => Promise<unknown>> = {
 }
 
 const prefetchComponents = (routeName: string) => {
-  // 🚀 核心跑分优化：如果检测到是 Lighthouse 跑分机器人或 Google 爬虫，禁止过度主动预加载 JS
+  // 🔐 安全锁：任何以 Admin 开头的管理后台页面，一律彻底拦截，禁止前台预加载
+  if (routeName && routeName.startsWith('Admin')) {
+    return
+  }
+
+  // 🚀 核心跑分优化：如果是 Lighthouse 或 搜索引擎蜘蛛，不进行预加载
   if (navigator.userAgent.includes('Chrome-Lighthouse') || navigator.userAgent.includes('Googlebot')) {
     return
   }
@@ -381,7 +386,8 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
   
-  if (to.name) {
+  // 💡 双重保险优化：仅对非后台路由触发主动组件预加载
+  if (to.name && !to.path.startsWith('/admin')) {
     prefetchComponents(to.name as string)
   }
   
