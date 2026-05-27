@@ -471,9 +471,13 @@ const handlePageChange = (page: number) => {
                 :aria-current="currentSlide === index ? 'true' : 'false'"
                 @click="currentSlide = index"
               >
-                <span ...></span>
+                <span 
+                  class="w-2 h-2 rounded-full transition-all duration-300 block"
+                  :class="currentSlide === index ? 'bg-primary w-6' : 'bg-gray-300 dark:bg-gray-700 hover:bg-gray-400'"
+                ></span>
+                <span class="sr-only">第 {{ index + 1 }} 张精选推荐</span>
               </button>
-              </div>
+            </div>
               <div class="flex gap-2 items-center"> <button
                   class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-dark-300 text-gray-400 hover:text-primary transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="上一张" @click="prevSlide"
                 >
