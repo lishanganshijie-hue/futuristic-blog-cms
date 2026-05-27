@@ -161,14 +161,15 @@ onMounted(() => {
       </dl>
     </section>
 
-    <nav v-if="blogStore.categories.length" aria-label="博客分类导航" class="sidebar-widget sidebar-widget-compact">
+    <nav aria-label="博客分类导航" class="sidebar-widget sidebar-widget-compact" style="min-height: 180px;">
       <h3 class="sidebar-widget-title sidebar-widget-title-compact flex items-center gap-2">
         <svg aria-hidden="true" class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
         内容分类
       </h3>
-      <div class="space-y-0.5">
+      
+      <div v-if="blogStore.categories.length" class="space-y-0.5">
         <router-link
           v-for="category in blogStore.categories"
           :key="category.id"
@@ -185,16 +186,24 @@ onMounted(() => {
           </span>
         </router-link>
       </div>
+
+      <div v-else class="space-y-3 px-2 py-1.5 animate-pulse">
+        <div class="h-4 bg-gray-200 dark:bg-dark-300 rounded w-4/5"></div>
+        <div class="h-4 bg-gray-200 dark:bg-dark-300 rounded w-3/4"></div>
+        <div class="h-4 bg-gray-200 dark:bg-dark-300 rounded w-5/6"></div>
+        <div class="h-4 bg-gray-200 dark:bg-dark-300 rounded w-2/3"></div>
+      </div>
     </nav>
 
-    <nav v-if="popularTags.length" aria-label="热门标签" class="sidebar-widget sidebar-widget-compact">
+    <nav aria-label="热门标签" class="sidebar-widget sidebar-widget-compact" style="min-height: 140px;">
       <h3 class="sidebar-widget-title sidebar-widget-title-compact flex items-center gap-2">
         <svg aria-hidden="true" class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
         </svg>
         高频标签
       </h3>
-      <div class="flex flex-wrap gap-1">
+      
+      <div v-if="popularTags.length" class="flex flex-wrap gap-1">
         <router-link
           v-for="tag in popularTags"
           :key="tag.id"
@@ -205,6 +214,16 @@ onMounted(() => {
         >
           {{ tag.name }}
         </router-link>
+      </div>
+
+      <div v-else class="flex flex-wrap gap-2 px-1 animate-pulse">
+        <div class="h-5 bg-gray-200 dark:bg-dark-300 rounded w-12"></div>
+        <div class="h-5 bg-gray-200 dark:bg-dark-300 rounded w-16"></div>
+        <div class="h-5 bg-gray-200 dark:bg-dark-300 rounded w-14"></div>
+        <div class="h-5 bg-gray-200 dark:bg-dark-300 rounded w-20"></div>
+        <div class="h-5 bg-gray-200 dark:bg-dark-300 rounded w-10"></div>
+        <div class="h-5 bg-gray-200 dark:bg-dark-300 rounded w-16"></div>
+        <div class="h-5 bg-gray-200 dark:bg-dark-300 rounded w-12"></div>
       </div>
     </nav>
 
