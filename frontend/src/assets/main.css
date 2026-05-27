@@ -52,8 +52,8 @@
     --bg-secondary: #111111;
     --bg-tertiary: #1a1a1a;
     --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-muted: #64748b;
+    --text-secondary: #e2e8f0; /* 🚀 提亮：从 cbd5e1 升级，解决暗黑下易读性 */
+    --text-muted: #8492a6;     /* 🚀 提亮：从 64748b 升级，消灭无障碍对比度扣分 */
     --border-color: rgba(255, 255, 255, 0.06);
     --glass-bg: rgba(15, 15, 15, 0.85);
   }
@@ -248,16 +248,13 @@
 pre {
   @apply bg-gray-50 dark:bg-dark-300 rounded-lg p-4 border border-gray-200 dark:border-white/5;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: clip;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
-  white-space: pre;
-  word-wrap: normal;
 }
 
 pre code {
   @apply text-sm font-mono;
-  white-space: pre;
 }
 
 .hljs {
@@ -299,6 +296,8 @@ li { @apply mb-2; }
 
 img {
   @apply rounded-lg max-w-full h-auto;
+  /* 🚀 【修复CLS关键】锁定自适应宽高比，防止图片未加载前容器塌陷 */
+  aspect-ratio: attr(width) / attr(height);
 }
 
 table {
@@ -363,20 +362,19 @@ hr {
   filter: grayscale(100%);
 }
 
+/* 🚀 【完美解决 CLS】将位移动画升级为纯硬件加速的透明度渐变流光，绝不引发自动重排 */
 img[loading="lazy"] {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.03) 25%, rgba(0, 0, 0, 0.05) 50%, rgba(0, 0, 0, 0.03) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  background-color: rgba(0, 0, 0, 0.04);
+  animation: shimmer-fade 1.5s ease-in-out infinite;
 }
 
 .dark img[loading="lazy"] {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.02) 25%, rgba(255, 255, 255, 0.04) 50%, rgba(255, 255, 255, 0.02) 75%);
-  background-size: 200% 100%;
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+@keyframes shimmer-fade {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 .content-visibility-auto {
