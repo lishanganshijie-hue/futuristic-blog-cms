@@ -22,26 +22,38 @@ export default async function handler(_req: any, res: any) {
     clearTimeout(id)
 
     if (!response.ok) {
-      // 如果后端接口返回 404 或 500，不把错误抛给用户，直接降级返回合法兜底
       res.setHeader('Cache-Control', 'public, max-age=3600')
       return res.status(200).send(defaultRobots)
     }
 
-    const content = await response.text()
+    const rawContent = await response.text()
+    const content = rawContent.trim()
 
-    // 【核心防错】：检查后端返回的是不是一堆 HTML 标签（比如后端崩了吐出报错网页）
-    if (content.trim().startsWith('<') || content.includes('<!DOCTYPE') || content.includes('<html')) {
+    // 🚀 【核心防错升级】全方位拦截不规范的文本
+    // 1. 拦截 HTML 格式
+    if (content.startsWith('<') || content.toLowerCase().includes('<!doctype') || content.toLowerCase().includes('<html')) {
       res.setHeader('Cache-Control', 'public, max-age=3600')
       return res.status(200).send(defaultRobots)
     }
 
-    // 走到这里说明内容合法
+    // 2. ⚡【精准狙击】拦截 JSON 格式（防止后端吐出 {"message": "..."} 导致爬虫报几十个错）
+    if (content.startsWith('{') && content.endsWith('}')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600')
+      return res.status(200).send(defaultRobots)
+    }
+
+    // 3. ⚡【严格白名单验证】真正合法的 robots.txt 必须包含 "user-agent:"
+    // 如果连这个关键字都没有，说明后端吐出的绝对是奇奇怪怪的非合规文本，直接降级
+    if (!content.toLowerCase().includes('user-agent:')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600')
+      return res.status(200).send(defaultRobots)
+    }
+
+    // 走到这里说明内容完美合法
     res.setHeader('Cache-Control', 'public, max-age=86400') // 缓存 24 小时
-    return res.status(200).send(content)
+    return res.status(200).send(rawContent)
 
   } catch (error) {
-    // ❌ 优化前：catch 块返回了 'Error fetching...'，爬虫不认识这行英文，会报错
-    // 🚀 优化后：即使网络彻底断开，也顽强地返回 200 和合法规范文本，确保 SEO 绝对不扣分
     res.setHeader('Cache-Control', 'public, max-age=600') // 严重错误时只缓存 10 分钟
     return res.status(200).send(defaultRobots)
   }
