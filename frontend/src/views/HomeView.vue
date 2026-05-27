@@ -464,15 +464,15 @@ const handlePageChange = (page: number) => {
               class="flex items-center justify-between px-2 py-1 border-t border-gray-100 dark:border-white/5"
             >
               <div class="flex gap-2.5 items-center"> <button
-                  v-for="(_, index) in featuredArticles"
-                  :key="index"
-                  class="py-3 px-1 flex items-center justify-center transition-all duration-300 focus:outline-none" @click="currentSlide = index"
-                >
-                  <span 
-                    class="h-1 rounded-full transition-all duration-300 block" 
-                    :class="currentSlide === index ? 'bg-primary w-3' : 'bg-gray-300 dark:bg-gray-600 w-1 hover:bg-primary/50'"
-                  ></span>
-                </button>
+                v-for="(_, index) in featuredArticles"
+                :key="index"
+                class="py-3 px-1 flex items-center justify-center transition-all duration-300 focus:outline-none" 
+                :aria-label="`切换到第 ${index + 1} 张精选推荐`"
+                :aria-current="currentSlide === index ? 'true' : 'false'"
+                @click="currentSlide = index"
+              >
+                <span ...></span>
+              </button>
               </div>
               <div class="flex gap-2 items-center"> <button
                   class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-dark-300 text-gray-400 hover:text-primary transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="上一张" @click="prevSlide"
@@ -621,11 +621,11 @@ const handlePageChange = (page: number) => {
                     <span
                       v-for="tag in article.tags.slice(0, 3)"
                       :key="tag.id"
-                      class="tag-badge text-[10px]"
+                      class="tag-badge text-[10px] font-medium contrast-125"
                       :style="{ 
                         color: tag.color, 
-                        backgroundColor: tag.color + '10',
-                        borderColor: tag.color + '30'
+                        backgroundColor: tag.color + '15',
+                        borderColor: tag.color + '40'
                       }"
                     >
                       {{ tag.name }}
@@ -635,7 +635,7 @@ const handlePageChange = (page: number) => {
                   <div class="article-meta mt-auto pt-2 border-t border-gray-100 dark:border-white/5">
                     <span
                       v-if="article.author || article.author_name"
-                      class="article-meta-item text-inherit w-full"
+                      class="article-meta-item text-gray-600 dark:text-gray-400 w-full"
                     >
                       <svg
                         class="w-3.5 h-3.5"
@@ -654,7 +654,7 @@ const handlePageChange = (page: number) => {
                     </span>
                   </div>
                   <div class="article-meta pt-2 flex flex-wrap gap-4 sm:gap-5 items-center">
-                    <span class="article-meta-item text-inherit">
+                    <span class="article-meta-item text-gray-600 dark:text-gray-400">
                       <svg
                         class="w-3.5 h-3.5"
                         fill="none"
@@ -671,7 +671,7 @@ const handlePageChange = (page: number) => {
                       {{ formatDate(article.created_at) }}
                     </span>
                     <span 
-                      class="article-meta-item relative text-inherit"
+                      class="article-meta-item relative text-gray-600 dark:text-gray-400"
                       @mouseenter="showTooltip(article.id, 'view')"
                       @mouseleave="hideTooltip"
                     >
@@ -703,7 +703,8 @@ const handlePageChange = (page: number) => {
                       </span>
                     </span>
                     <button
-                      class="article-meta-item article-action-btn relative text-inherit"
+                      class="article-meta-item article-action-btn relative text-gray-600 dark:text-gray-400"
+                      :aria-label="article.is_liked ? '取消点赞' : '点赞文章'"
                       @click="handleLike($event, article)"
                       @mouseenter="showTooltip(article.id, 'like')"
                       @mouseleave="hideTooltip"
@@ -730,7 +731,8 @@ const handlePageChange = (page: number) => {
                       </span>
                     </button>
                     <button
-                      class="article-meta-item article-action-btn relative text-inherit"
+                      class="article-meta-item article-action-btn relative text-gray-600 dark:text-gray-400"
+                      aria-label="查看并跳转至评论区"
                       @click="goToComments($event, article.slug)"
                       @mouseenter="showTooltip(article.id, 'comment')"
                       @mouseleave="hideTooltip"
@@ -758,9 +760,10 @@ const handlePageChange = (page: number) => {
                     </button>
                     <button
                       :class="[
-                        'article-meta-item article-action-btn relative text-inherit',
-                        { 'text-amber-500': article.is_bookmarked }
+                        'article-meta-item article-action-btn relative',
+                        article.is_bookmarked ? 'text-amber-700 dark:text-amber-500' : 'text-gray-600 dark:text-gray-400'
                       ]"
+                      :aria-label="article.is_bookmarked ? '取消收藏' : '收藏文章'"
                       @click="handleBookmark($event, article)"
                       @mouseenter="showTooltip(article.id, 'bookmark')"
                       @mouseleave="hideTooltip"
@@ -870,26 +873,26 @@ const handlePageChange = (page: number) => {
   }
 }
 
-/* 优化卡片底部互动按钮的触摸热区 */
+/* 提升物理控制大小以通过 Lighthouse 审查，同时利用负负抵消，确保不影响原有的紧凑视觉排版 */
 .article-action-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 32px;
-  padding: 4px;
-  margin: -4px 0; /* 抵消内边距，确保不影响你原有的排版对齐 */
+  min-width: 40px;  /* 提高物理像素区域以通过无障碍检测 */
+  height: 40px;     /* 提高物理像素区域以通过无障碍检测 */
+  padding: 6px;
+  margin: -8px 0;   /* 增加负边距，精确抵消物理扩充，完全不挤压上下布局 */
 }
 
-/* 核心魔法：利用透明的伪元素，向四周隐形扩展点击热区，直接拉满无障碍标准 */
+/* 核心魔法：隐形透明覆盖，确保手机端绝对轻松盲操 */
 .article-action-btn::after {
   content: '';
   position: absolute;
-  top: -8px;
-  bottom: -8px;
-  left: -8px;
-  right: -8px;
+  top: -6px;
+  bottom: -6px;
+  left: -6px;
+  right: -6px;
   cursor: pointer;
 }
 </style>
