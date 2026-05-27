@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, computed, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBlogStore, useAuthStore, useUserInteractionStore, useInitStore } from '@/stores'
-import { prefetchAllCommonPages, prefetchArticleComponent } from '@/router'
+
 import { prefetchAllData, dataPrefetch } from '@/utils/prefetch'
 import Pagination from '@/components/common/Pagination.vue'
 import { usePageSize } from '@/composables/usePageSize'
@@ -209,7 +209,11 @@ const goToComments = (e: Event, slug: string) => {
 const articleHoverPrefetchCache = new Set<string>()
 
 const handleArticleHover = (slug: string) => {
-  prefetchArticleComponent()
+  // ⚡ 变成动态按需引入，不污染首屏关键路径
+  import('@/router').then(({ prefetchArticleComponent }) => {
+    prefetchArticleComponent()
+  }).catch(() => {})
+
   if (articleHoverPrefetchCache.has(slug)) return
   articleHoverPrefetchCache.add(slug)
   import('@/api').then(({ articleApi }) => {
@@ -316,8 +320,23 @@ onMounted(async () => {
     slideInterval = setInterval(nextSlide, 6000)
   }
 
-  prefetchAllCommonPages()
-  prefetchAllData()
+  // ⚡ 完美平替：将预加载剥离出首屏关键路径，推迟到主线程空闲时动态触发
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    requestIdleCallback(() => {
+      import('@/router').then(({ prefetchAllCommonPages }) => {
+        prefetchAllCommonPages()
+      }).catch(() => {})
+      prefetchAllData()
+    })
+  } else {
+    // 降级兼容不支持 requestIdleCallback 的旧浏览器
+    setTimeout(() => {
+      import('@/router').then(({ prefetchAllCommonPages }) => {
+        prefetchAllCommonPages()
+      }).catch(() => {})
+      prefetchAllData()
+    }, 2000)
+  }
 })
 
 onUnmounted(() => {
@@ -374,8 +393,8 @@ const handlePageChange = (page: number) => {
                         :src="getMediaUrl(currentFeatured.cover_image)"
                         :alt="currentFeatured.title"
                         class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 rounded-none"
-                        loading="eager"
-                        decoding="async"
+                        loading="eager"       decoding="async"
+                        fetchpriority="high"  
                       >
                       <div class="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent dark:from-black/70 dark:via-black/40 dark:to-transparent" />
                       <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent dark:from-black/60 dark:to-transparent" />
@@ -444,19 +463,19 @@ const handlePageChange = (page: number) => {
               v-if="featuredArticles.length > 1"
               class="flex items-center justify-between px-2 py-1 border-t border-gray-100 dark:border-white/5"
             >
-              <div class="flex gap-1">
-                <button
+              <div class="flex gap-2.5 items-center"> <button
                   v-for="(_, index) in featuredArticles"
                   :key="index"
-                  class="h-1 rounded-full transition-all duration-300"
-                  :class="currentSlide === index ? 'bg-primary w-3' : 'bg-gray-300 dark:bg-gray-600 w-1 hover:bg-primary/50'"
-                  @click="currentSlide = index"
-                />
+                  class="py-3 px-1 flex items-center justify-center transition-all duration-300 focus:outline-none" @click="currentSlide = index"
+                >
+                  <span 
+                    class="h-1 rounded-full transition-all duration-300 block" 
+                    :class="currentSlide === index ? 'bg-primary w-3' : 'bg-gray-300 dark:bg-gray-600 w-1 hover:bg-primary/50'"
+                  ></span>
+                </button>
               </div>
-              <div class="flex gap-0.5">
-                <button
-                  class="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-dark-300 text-gray-400 hover:text-primary transition-colors"
-                  @click="prevSlide"
+              <div class="flex gap-2 items-center"> <button
+                  class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-dark-300 text-gray-400 hover:text-primary transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="上一张" @click="prevSlide"
                 >
                   <svg
                     class="w-3 h-3"
@@ -470,8 +489,9 @@ const handlePageChange = (page: number) => {
                     d="M15 19l-7-7 7-7"
                   /></svg>
                 </button>
+  
                 <button
-                  class="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-dark-300 text-gray-400 hover:text-primary transition-colors"
+                  class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-dark-300 text-gray-400 hover:text-primary transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="下一张"
                   @click="nextSlide"
                 >
                   <svg
@@ -633,7 +653,7 @@ const handlePageChange = (page: number) => {
                       <span class="truncate">{{ article.author?.username || article.author_name || '已注销用户' }}</span>
                     </span>
                   </div>
-                  <div class="article-meta pt-2">
+                  <div class="article-meta pt-2 flex flex-wrap gap-4 sm:gap-5 items-center">
                     <span class="article-meta-item text-inherit">
                       <svg
                         class="w-3.5 h-3.5"
@@ -848,5 +868,28 @@ const handlePageChange = (page: number) => {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+}
+
+/* 优化卡片底部互动按钮的触摸热区 */
+.article-action-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 4px;
+  margin: -4px 0; /* 抵消内边距，确保不影响你原有的排版对齐 */
+}
+
+/* 核心魔法：利用透明的伪元素，向四周隐形扩展点击热区，直接拉满无障碍标准 */
+.article-action-btn::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: -8px;
+  right: -8px;
+  cursor: pointer;
 }
 </style>
