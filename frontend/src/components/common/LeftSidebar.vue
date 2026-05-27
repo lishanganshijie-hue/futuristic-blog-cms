@@ -35,24 +35,18 @@ const getLogoUrl = (url: string) => {
   return `/${url}`
 }
 
-// 🚀 【核心重构】完美的访客/管理员双重头像兜底逻辑
+// 🚀 【完美修复】精简逻辑，直接拥抱固定头像，放行 TypeScript 编译
 const adminAvatar = computed(() => {
-  // 1. 如果管理员登录了，100% 展现后端数据库里最新的动态头像路径
+  // 1. 如果管理员登录了，展现后端数据库里最新的动态头像路径
   if (userProfileStore.profile?.avatar_url) {
     return userProfileStore.profile.avatar_url
   }
   
-  // 2. 如果是未登录的普通访客，直接雷打不动地展示你在下方写死的博主大头像！
-  // 💡 请把下面单引号里的文字，替换为你固定的 R2 头像链接（例如 'https://r2.yourdomain.com/avatar.jpg'）
-  // 或者是项目 public 目录下的本地静态图片路径（例如 '/avatar.jpg'）
+  // 2. 如果是未登录的普通访客，直接雷打不动地展示你的 R2 头像
   const guestAvatarLink = 'https://ipooo.ccwu.cc/avatars/avatar_1_1779799479973.jpg'
   
-  if (guestAvatarLink && guestAvatarLink !== '填写你未登录时想展示的固定博主头像链接') {
-    return guestAvatarLink
-  }
-  
-  // 3. 如果上面没填，最后才用站点 Logo 兜底
-  return siteConfigStore.siteLogoUrl || ''
+  // 3. 如果有值就直接返回，没有就用站点 Logo 兜底
+  return guestAvatarLink || siteConfigStore.siteLogoUrl || ''
 })
 
 const handleEmailClick = (e: MouseEvent, rawUrl: string) => {
