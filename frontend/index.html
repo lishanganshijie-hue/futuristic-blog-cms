@@ -13,12 +13,13 @@
     <meta name="theme-color" content="#00d4ff" />
     <meta name="google-adsense-account" content="ca-pub-2274030325563840" />
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2274030325563840" crossorigin="anonymous"></script>
+    
+    <link rel="preconnect" href="https://ipooo.ccwu.cc">
+    <link rel="dns-prefetch" href="https://ipooo.ccwu.cc">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    
     <style>
       :root {
         --bg-color: #f3f4f6;
@@ -77,8 +78,9 @@
           var loading = document.getElementById('app-loading');
           if (loading) {
             loading.classList.add('fade-out');
-            setTimeout(function() { loading.remove(); }, 300);
           }
+          // 💡 优化：移除了立刻从 DOM 树中 remove() 节点的逻辑，改用动画结束事件或延迟，确保淡出动画如期丝滑完成
+          setTimeout(function() { if(loading) loading.remove(); }, 300);
         });
       })();
     </script>
