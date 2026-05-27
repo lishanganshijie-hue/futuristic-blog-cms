@@ -35,11 +35,23 @@ const getLogoUrl = (url: string) => {
   return `/${url}`
 }
 
-// 🚀 核心新增：锁定后台上传的自定义原图头像，若没有则使用站点 Logo 兜底
+// 🚀 【核心重构】完美的访客/管理员双重头像兜底逻辑
 const adminAvatar = computed(() => {
+  // 1. 如果管理员登录了，100% 展现后端数据库里最新的动态头像路径
   if (userProfileStore.profile?.avatar_url) {
     return userProfileStore.profile.avatar_url
   }
+  
+  // 2. 如果是未登录的普通访客，直接雷打不动地展示你在下方写死的博主大头像！
+  // 💡 请把下面单引号里的文字，替换为你固定的 R2 头像链接（例如 'https://r2.yourdomain.com/avatar.jpg'）
+  // 或者是项目 public 目录下的本地静态图片路径（例如 '/avatar.jpg'）
+  const guestAvatarLink = 'https://ipooo.ccwu.cc/avatars/avatar_1_1779799479973.jpg'
+  
+  if (guestAvatarLink && guestAvatarLink !== '填写你未登录时想展示的固定博主头像链接') {
+    return guestAvatarLink
+  }
+  
+  // 3. 如果上面没填，最后才用站点 Logo 兜底
   return siteConfigStore.siteLogoUrl || ''
 })
 
@@ -106,8 +118,8 @@ watch(() => siteConfigStore.showGithubStats, (show) => {
 
 onMounted(() => {
   socialLinksStore.fetchProfile()
-  // 🚀 核心新增：前台挂载时拉取一次管理员个人资料，确保存储库中同步到最新的头像路径
-  userProfileStore.fetchProfile().catch((err) => console.error('前台获取管理员头像失败:', err))
+  // 🚀 【核心优化】配合已经重构的 userProfile Store，401已被静默吞掉，此处不加冗余的 console.error 污染控制台
+  userProfileStore.fetchProfile().catch(() => {})
 })
 </script>
 
