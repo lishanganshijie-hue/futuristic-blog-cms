@@ -15,13 +15,13 @@ export interface GitHubStats {
 
 let fetchConfigsPromise: Promise<void> | null = null
 
+// 🚀 【核心重构】移除复杂的 Canvas 渲染，直接更新 href，彻底绝迹 CORS 跨域报错
 const updateFavicon = (logoUrl: string) => {
   let favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement
+  let appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement
   
   if (!logoUrl) {
-    if (favicon) {
-      favicon.href = '/favicon.svg'
-    }
+    if (favicon) favicon.href = '/favicon.svg'
     return
   }
   
@@ -30,51 +30,21 @@ const updateFavicon = (logoUrl: string) => {
     fullUrl = logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`
   }
   
-  const img = new Image()
-  img.crossOrigin = 'anonymous'
-  img.onload = () => {
-    const size = 64
-    const canvas = document.createElement('canvas')
-    canvas.width = size
-    canvas.height = size
-    const ctx = canvas.getContext('2d')
-    
-    if (ctx) {
-      ctx.beginPath()
-      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
-      ctx.closePath()
-      ctx.clip()
-      
-      const minDim = Math.min(img.width, img.height)
-      const sx = (img.width - minDim) / 2
-      const sy = (img.height - minDim) / 2
-      ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size)
-      
-      if (!favicon) {
-        favicon = document.createElement('link')
-        favicon.rel = 'icon'
-        document.head.appendChild(favicon)
-      }
-      favicon.href = canvas.toDataURL('image/png')
-      
-      let appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement
-      if (!appleTouchIcon) {
-        appleTouchIcon = document.createElement('link')
-        appleTouchIcon.rel = 'apple-touch-icon'
-        document.head.appendChild(appleTouchIcon)
-      }
-      appleTouchIcon.href = canvas.toDataURL('image/png')
-    }
+  // 1. 动态生成或更新标准 Favicon
+  if (!favicon) {
+    favicon = document.createElement('link')
+    favicon.rel = 'icon'
+    document.head.appendChild(favicon)
   }
-  img.onerror = () => {
-    if (!favicon) {
-      favicon = document.createElement('link')
-      favicon.rel = 'icon'
-      document.head.appendChild(favicon)
-    }
-    favicon.href = fullUrl
+  favicon.href = fullUrl
+  
+  // 2. 动态生成或更新 iOS 设备的快捷图标
+  if (!appleTouchIcon) {
+    appleTouchIcon = document.createElement('link')
+    appleTouchIcon.rel = 'apple-touch-icon'
+    document.head.appendChild(appleTouchIcon)
   }
-  img.src = fullUrl
+  appleTouchIcon.href = fullUrl
 }
 
 export const useSiteConfigStore = defineStore('siteConfig', () => {
