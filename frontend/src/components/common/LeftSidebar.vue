@@ -43,7 +43,7 @@ const adminAvatar = computed(() => {
   }
   
   // 2. 如果是未登录的普通访客，直接雷打不动地展示你的 R2 头像
-  const guestAvatarLink = 'https://ipooo.ccwu.cc/avatars/avatar_2.webp'
+  const guestAvatarLink = 'https://ipooo.ccwu.cc/avatars/avatar_2%EF%BC%88372x372%EF%BC%89.jpg'
   
   // 3. 如果有值就直接返回，没有就用站点 Logo 兜底
   return guestAvatarLink || siteConfigStore.siteLogoUrl || ''
