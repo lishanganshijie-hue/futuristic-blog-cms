@@ -18,11 +18,18 @@ export const useUserProfileStore = defineStore('userProfile', () => {
     fetchPromise = (async () => {
       try {
         profile.value = await userProfileApi.getProfile()
-      } catch (error: unknown) {
+      } catch (error: any) {
         if (isCancelError(error)) {
           fetchPromise = null
           return
         }
+        
+        // 🚀 核心改动：如果是 401 (未登录)，属于正常前台访客状态，静默退出，不打扰控制台
+        if (error?.response?.status === 401) {
+          return
+        }
+        
+        // 真正的服务器崩溃或网络断开（比如 500/502/404）依然会老实报错
         console.error('Failed to fetch user profile:', error)
       } finally {
         loading.value = false
@@ -37,10 +44,16 @@ export const useUserProfileStore = defineStore('userProfile', () => {
     try {
       profile.value = await userProfileApi.getProfile()
       avatarUpdatedAt.value = Date.now()
-    } catch (error: unknown) {
+    } catch (error: any) {
       if (isCancelError(error)) {
         return
       }
+      
+      // 🚀 核心改动：刷新时如果是 401，同样静默处理
+      if (error?.response?.status === 401) {
+        return
+      }
+      
       console.error('Failed to refresh user profile:', error)
     }
   }
